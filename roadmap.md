@@ -1,174 +1,235 @@
 # steam-go Roadmap
 
-## 1. 当前状态概览
+## 当前状态
 
-`steam-go` 当前已经完成从旧仓库 `gf-steam-sdk` 向“轻量、聚焦的 Steam Web API SDK”方向的主体重构。
+`steam-go` 的 Web API 主体重构已经基本完成。
 
-从 [`steam-go-architecture-refactor-plan.md`](./steam-go-architecture-refactor-plan.md) 的执行阶段来看，可以这样判断：
+- 已完成统一 `Client`
+- 已完成 `Option`、认证注入、重试、限流、代理选择
+- 已完成统一错误模型
+- 已完成 `typed/raw` 双层返回
+- 已完成核心 API 迁移：
+  - `SteamUser`
+  - `PlayerService`
+  - `SteamNews`
+  - `SteamUserStats`
+  - `AccountCartService`
+  - `BillingService`
+  - `CommunityService`
+  - `FamilyGroupsService`
+  - `LoyaltyRewardsService`
+- 已完成 `client.API.*` 二层入口重构
+- 已完成 README、examples、CI、测试基线
 
-- `Phase 0 设计冻结`：已完成
-- `Phase 1 仓库初始化`：已完成
-- `Phase 2 核心请求链路打通`：已完成
-- `Phase 3 首批 API 迁移`：已完成，并且已经补上了原计划里可后置的 `steamuserstats`
-- `Phase 4 清理遗留设计`：基本完成
-- `Phase 5 A2S Addons 接入`：未开始
-- `Phase 6 发布前收尾`：部分完成
+按仓库最初的大路线看，当前整体完成度大约在 `80%` 左右。
+如果只看 “轻量、聚焦、长期可维护的 Steam Web API SDK” 这个 v1 主目标，完成度已经在 `90%+`。
 
-## 2. 完成度判断
+## 接下来的主线
 
-### 2.1 按“原始重构总计划”估算
+接下来不建议再大改 Web API 核心结构，优先做三件事：
 
-如果按整份计划书来算，包括 `addons/a2s`、OAuth 扩展预留、更多发布工程化内容在内：
+1. 继续补高价值 Web API 组，但保持现有 `client.API.*` 架构不变
+2. 把 A2S 作为明确的 `addon` 能力接入，而不是继续塞回核心 Web API 主体
+3. 为未来 OAuth / credential source 预留更清晰的扩展点
 
-> **整体完成度约为 80% 左右。**
+## 版本路线
 
-这个判断的依据是：
+### v2.x
 
-- 核心架构、目录、请求链路、错误模型、Option 体系已经落地
-- 核心 API 组已经覆盖 `steamuser`、`playerservice`、`steamnews`、`steamuserstats`
-- 测试、README、examples 已经具备可用雏形
-- 但 `addons/a2s`、OAuth 扩展点、CLI、更多 API 组、发布工程化收尾还没有系统推进
+目标：把 Web API 主体打磨到可长期发布的质量。
 
-### 2.2 按“v1 核心目标”估算
+- 补更多高价值官方 API 组
+- 补更完整的 examples
+- 补更系统的集成测试和边界测试
+- 完善 README 和发布说明
 
-如果只看计划里最核心的 v1 目标，也就是“做一个干净、稳定、长期可维护的 Steam Web API SDK”：
+### v3
 
-> **v1 核心目标完成度约为 90% 以上。**
+目标：引入扩展层，而不是继续膨胀核心 SDK。
 
-原因是：
+- 接入 `addons/a2s`
+- 明确 A2S 与 Web API 的边界
+- 评估 OAuth 扩展设计
 
-- 核心定位已经明确并落地
-- 非目标内容没有继续回流进主仓库
-- 目录结构和 API 分组已经与 Steam 官方命名体系对齐
-- typed/raw 双层返回、轻量 transport、可选/轮转 key、基础 failover 都已经具备
+## A2S 规划
 
-## 3. 已完成内容
+### 目标定位
 
-### 3.1 核心架构
+A2S 不应该继续放进 Web API 主体里。
 
-- 统一 `Client` 入口已完成
-- `Option` 配置体系已完成
-- 轻量 `Logger` 接口已完成
-- `internal/request`、`internal/transport`、`internal/auth`、`internal/errors`、`internal/endpoint` 已完成
-- typed response + raw response 双层返回已完成
+推荐结构：
 
-### 3.2 首批核心 API
+```text
+steam-go/
+  addons/
+    a2s/
+      client.go
+      options.go
+      types.go
+      errors.go
+```
 
-- `SteamUser`
-  - `GetPlayerSummaries`
-- `PlayerService`
-  - `GetOwnedGames`
-- `SteamNews`
-  - `GetNewsForApp`
-- `SteamUserStats`
-  - `GetPlayerAchievements`
+对外使用方式建议保持独立：
 
-### 3.3 认证与请求稳定性
+```go
+a2sClient, err := a2s.NewClient("1.2.3.4:27015", ...)
+info, err := a2sClient.QueryInfo(ctx)
+players, err := a2sClient.QueryPlayers(ctx)
+rules, err := a2sClient.QueryRules(ctx)
+```
 
-- API key 现在支持“不填写 key”
-- 支持 `WithAPIKey(...)`
-- 支持 `WithAPIKeys(...)` 做轮转
-- 支持自定义 `APIKeyProvider`
-- 已支持 `401/429` 自动切换下一个 key 并重试
-- `5xx` 与网络错误重试已具备
+不要把它挂进 `steam.Client`，否则未来 Web API 和 UDP Query 两条线又会重新耦合。
 
-### 3.4 文档与测试
+### 建议的接入策略
 
-- README 已经成型
-- 每个核心 API 组已有 example
-- `go test ./...` 通过
-- 已覆盖请求构建、query 编码、错误映射、key failover、raw/typed 解码等关键路径
+优先建议：
 
-## 4. 未完成内容
+1. 第一阶段基于现有成熟实现做一层轻封装
+2. 第二阶段按真实使用情况决定是否 fork
+3. 不建议一开始就完整自研
 
-### 4.1 计划中尚未推进
+原因是 A2S 看起来协议不大，但兼容性细节并不少，真正麻烦的是不同游戏、不同服务端实现、challenge 刷新、分包、多包、超时和异常包处理。
 
-- `addons/a2s`
-- OAuth 扩展点的正式设计与实现
-- CLI
-- 更多 Steam Web API 组
-- 更完整的 rate limit / retry 策略能力
-- 发布前工程化收尾
-  - changelog / release notes 规范
-  - GitHub Topics
-  - 更完整的版本发布策略
+### 对 `rumblefrog/go-a2s` 的评估
 
-### 4.2 尚可继续优化的点
+截至 `2026-04-15`，`rumblefrog/go-a2s` 的现状是：
 
-- 将 `README` 从“可用”提升到“对外发布级别”
-- 补更多真实文档示例和错误处理示例
-- 增加更多回归测试和边界测试
-- 梳理未来 OAuth / token source / credential injector 的演进接口
+- GitHub 仓库有 `72` stars、`19` forks、`1` 个 open issue
+- README 明确说协议本身变化很少，所以更新不会频繁
+- 最近一次 release 是 `v1.0.3`，发布日期是 `2026-03-24`
+- 最近一次提交也是 `2026-03-24`
+- 当前仍有一个 open issue：长期持有 client 时，服务端重新下发 challenge 可能导致 `unsupported protocol header`
 
-## 5. 后续路线图
+来源：
 
-## v2 已完成
+- [GitHub 仓库首页](https://github.com/rumblefrog/go-a2s)
+- [提交历史](https://github.com/rumblefrog/go-a2s/commits/master/)
+- [v1.0.3 release](https://github.com/rumblefrog/go-a2s/releases/tag/v1.0.3)
+- [issue #13](https://github.com/rumblefrog/go-a2s/issues/13)
 
-- 补齐 `steamuserstats`
-- 完成 key failover
-- 保持现有公开 API 基本兼容
+我的判断：
 
-## v2.1 核心增强
+- 它不是“无人维护的死库”
+- 但也不是“高频、强担保维护”的上游
+- 作为 `addons/a2s` 的第一阶段底层依赖是可以接受的
+- 如果你准备长期承接 A2S 质量责任，最终大概率还是会走向 fork 或替换实现
 
-目标：继续补强 Steam Web API 主线，而不扩散边界。
+### 是否直接用 upstream
 
-- 增加 1~2 组高价值官方 API
-  - 候选：`steamapps`
-  - 候选：`steameconomy`
-- 补更多 endpoint registry 常量
-- 扩充 typed/raw 测试覆盖
-- 增加对 `401/429/5xx` 重试行为的文档说明
+如果目标是尽快把 A2S 能力接回 `steam-go`，我建议：
 
-## v2.2 认证与传输增强
+- 第一版直接依赖 `github.com/rumblefrog/go-a2s`
+- 在 `addons/a2s` 里做你自己的接口、错误包装、超时和批量能力
+- 不要让业务代码直接依赖上游库类型
 
-目标：让 SDK 在复杂环境下更稳，但仍保持轻量。
+这样做的好处：
 
-- 抽象更清晰的 auth provider 演进接口
-- 为未来 OAuth 预留 token source / credential injector
-- 细化 retry policy 与 rate limit policy
-- 补充更多自定义 `ProxySelector` / `APIKeyProvider` 示例
+- 集成成本最低
+- 可以快速验证 API 设计
+- 后面切换到底层 fork 或自研时，对外 API 不需要推倒重来
 
-## v3 扩展能力
+### 是否 fork 一个版本自己维护
 
-目标：在核心稳定后，再进入非核心扩展。
+如果你准备把 A2S 当成长期卖点，而不是“顺带支持”，那我更推荐中期 fork。
 
-- 设计并接入 `addons/a2s`
-- 明确其与 Web API 主体的边界
-- 评估是否拆为独立扩展模块
+比较适合 fork 的信号有：
 
-## 发布前里程碑
+- 你需要修 upstream 的 challenge 刷新问题
+- 你需要为特定游戏做兼容修复
+- 你需要更强的超时、重试、并发批量查询能力
+- 你希望发布节奏、CI、Go 版本策略完全由自己掌控
 
-### M1 核心 SDK 稳定
+建议不是“现在立刻 fork”，而是：
 
-- 现有 4 组 API 行为稳定
-- 文档与测试补齐到可对外说明
+- `v3.0`: 先用 upstream 做 adapter
+- `v3.1`: 如果发现需要 patch，就 fork 到你自己的命名空间
+- `v3.2+`: 再决定继续维护 fork，还是逐步替换成自研实现
 
-### M2 首个公开可用版本
+### 是否重新实现
 
-- README 达到对外发布标准
-- 版本策略明确
-- Release 说明和基础工程化补齐
+重新实现不是做不到，但不建议作为第一步。
 
-### M3 扩展准备完成
+难度评估：
 
-- OAuth 演进方向明确
-- A2S 扩展边界明确
+- 只做最基础的 `A2S_INFO / A2S_PLAYER / A2S_RULES`，并在少量常见服务器上可用：`中等`
+- 做到可对外稳定发布、覆盖 challenge、分包、多包、异常包、长连接行为、各类游戏兼容：`中高`
 
-## 6. 推荐下一步
+粗略估算：
 
-如果继续沿着“最符合当前仓库主线”的方向推进，建议优先级如下：
+- 最小可用版：约 `3-5` 天
+- 可在仓库里作为 addon 发布的稳定版：约 `1-2` 周
+- 做到比较放心地长期维护：约 `3-6` 周，取决于你是否愿意搭真实服务器测试矩阵
 
-1. 先把 `README`、错误处理说明、key failover 说明补成对外发布级别
-2. 再补 1~2 组高价值官方 API，继续增强 Web API 覆盖
-3. 等主线稳定后，再进入 `addons/a2s` 和 OAuth 扩展点设计
+真正麻烦的部分不是“协议字段怎么解析”，而是：
 
-## 7. 一句话结论
+- challenge 重新下发
+- 多包响应拼装
+- 超规格服务端实现
+- 老游戏和非标准服务端
+- 真实网络超时和 UDP 丢包行为
 
-`steam-go` 的**核心重构其实已经基本成功**：
+### 当前推荐决策
 
-- 如果按“原始总计划”算，**约完成 80%**
-- 如果按“v1 核心目标”算，**约完成 90%+**
+推荐决策是：
 
-现在最适合的推进方式，不是重新大改结构，而是：
+1. `v3.0` 先做 `addons/a2s`
+2. 底层先用 `rumblefrog/go-a2s`
+3. 在 `addons/a2s` 外层建立自己的稳定 API
+4. 增加真实服务器回归测试样例
+5. 观察一到两个迭代，再决定是否 fork
 
-> **继续沿当前架构补核心 API、补文档、补发布质量，然后再做扩展层。**
+不推荐当前采用的方案：
+
+- 不推荐直接把第三方 A2S 类型暴露给 `steam-go` 用户
+- 不推荐现在就完整自研
+- 不推荐使用 `WoozyMasta/a2s` 作为直接依赖
+
+最后这一点很重要：`WoozyMasta/a2s` 当前是 `AGPL-3.0`，和你现在仓库的 `MIT` 方向不匹配，不适合作为直接集成依赖。它可以参考，但不适合直接拿来接进主仓库。
+
+来源：
+
+- [WoozyMasta/a2s](https://github.com/WoozyMasta/a2s)
+
+## A2S 的执行顺序
+
+### Phase A
+
+建立 `addons/a2s` 目录和最小 API：
+
+- `NewClient`
+- `QueryInfo`
+- `QueryPlayers`
+- `QueryRules`
+- `Close`
+
+### Phase B
+
+补适配层能力：
+
+- timeout option
+- max packet size option
+- 统一错误包装
+- 基础 examples
+
+### Phase C
+
+补面向真实使用的能力：
+
+- 批量查询
+- context 支持
+- 真实服务器手动测试
+- 回归测试基线
+
+### Phase D
+
+决定底层策略：
+
+- 保持 upstream
+- fork upstream
+- 替换为自研实现
+
+## 一句话结论
+
+`steam-go` 现在最合适的 A2S 路线不是“立刻重写”，而是：
+
+> 先把 A2S 作为独立 addon 接回来，底层先吃 `rumblefrog/go-a2s`，对外暴露自己的稳定接口，等真实需求证明有必要，再 fork 或替换实现。
