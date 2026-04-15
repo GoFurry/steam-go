@@ -35,7 +35,6 @@ type clientConfig struct {
 	retry               int
 	rateLimit           int
 	proxySelector       ProxySelector
-	logger              Logger
 }
 
 func defaultClientConfig() clientConfig {
@@ -44,7 +43,6 @@ func defaultClientConfig() clientConfig {
 		timeout:   10 * time.Second,
 		retry:     0,
 		rateLimit: 0,
-		logger:    noopLogger{},
 	}
 }
 
@@ -173,17 +171,6 @@ func WithRateLimit(requestsPerSecond int) Option {
 func WithProxySelector(selector ProxySelector) Option {
 	return func(cfg *clientConfig) error {
 		cfg.proxySelector = selector
-		return nil
-	}
-}
-
-// WithLogger injects the SDK logger implementation.
-func WithLogger(logger Logger) Option {
-	return func(cfg *clientConfig) error {
-		if logger == nil {
-			return fmt.Errorf("logger must not be nil")
-		}
-		cfg.logger = logger
 		return nil
 	}
 }

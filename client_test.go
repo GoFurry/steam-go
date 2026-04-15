@@ -11,6 +11,9 @@ import (
 	"time"
 
 	steam "github.com/GoFurry/steam-go"
+	"github.com/GoFurry/steam-go/api/accountcartservice"
+	"github.com/GoFurry/steam-go/api/familygroupsservice"
+	"github.com/GoFurry/steam-go/api/loyaltyrewardsservice"
 	"github.com/GoFurry/steam-go/api/playerservice"
 	"github.com/GoFurry/steam-go/api/steamnews"
 	"github.com/GoFurry/steam-go/api/steamuserstats"
@@ -26,6 +29,306 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	if client == nil {
 		t.Fatal("expected client")
 	}
+	if client.AccountCartService == nil || client.BillingService == nil || client.CommunityService == nil {
+		t.Fatal("expected new core services to be initialized")
+	}
+	if client.FamilyGroupsService == nil || client.LoyaltyRewardsService == nil {
+		t.Fatal("expected access-token services to be initialized")
+	}
+}
+
+func TestAccountCartServiceGetCart(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/IAccountCartService/GetCart/v1/" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("access_token"); got != "access-token-a" {
+			t.Fatalf("unexpected access token: %s", got)
+		}
+		if got := r.URL.Query().Get("user_country"); got != "gb" {
+			t.Fatalf("unexpected user_country: %s", got)
+		}
+		_, _ = w.Write([]byte(`{"response":{"cart":{"line_items":[{"line_item_id":"1","type":1,"packageid":123,"is_valid":true,"time_added":1700000000,"price_when_added":{"amount_in_cents":"999","currency_code":1,"formatted_amount":"$9.99"},"flags":{"is_gift":false,"is_private":true}}],"subtotal":{"amount_in_cents":"999","currency_code":1,"formatted_amount":"$9.99"},"is_valid":true}}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithBaseURL(server.URL),
+		steam.WithAccessToken("access-token-a"),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	resp, err := client.AccountCartService.GetCart(context.Background(), &accountcartservice.GetCartOptions{UserCountry: "gb"})
+	if err != nil {
+		t.Fatalf("GetCart returned error: %v", err)
+	}
+	if len(resp.Response.Cart.LineItems) != 1 {
+		t.Fatalf("unexpected line items: %d", len(resp.Response.Cart.LineItems))
+	}
+	if resp.Response.Cart.Subtotal.AmountInCents != "999" {
+		t.Fatalf("unexpected subtotal: %s", resp.Response.Cart.Subtotal.AmountInCents)
+	}
+}
+
+func TestAccountCartServiceDeleteCart(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/IAccountCartService/DeleteCart/v1/" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"response":{}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithBaseURL(server.URL),
+		steam.WithAccessToken("access-token-a"),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.AccountCartService.DeleteCart(context.Background())
+	if err != nil {
+		t.Fatalf("DeleteCart returned error: %v", err)
+	}
+}
+
+func TestBillingServiceGetRecurringSubscriptionsCount(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("access_token"); got != "access-token-a" {
+			t.Fatalf("unexpected access token: %s", got)
+		}
+		_, _ = w.Write([]byte(`{"response":{"active_subscriptions_count":2,"inactive_subscriptions_count":1}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithBaseURL(server.URL),
+		steam.WithAccessToken("access-token-a"),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	resp, err := client.BillingService.GetRecurringSubscriptionsCount(context.Background())
+	if err != nil {
+		t.Fatalf("GetRecurringSubscriptionsCount returned error: %v", err)
+	}
+	if resp.Response.ActiveSubscriptionsCount != 2 || resp.Response.InactiveSubscriptionsCount != 1 {
+		t.Fatalf("unexpected response: %#v", resp.Response)
+	}
+}
+
+func TestCommunityServiceGetApps(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if got := query.Get("appids[0]"); got != "550" {
+			t.Fatalf("unexpected appids[0]: %s", got)
+		}
+		if got := query.Get("appids[1]"); got != "570" {
+			t.Fatalf("unexpected appids[1]: %s", got)
+		}
+		_, _ = w.Write([]byte(`{"response":{"apps":[{"appid":550,"name":"Left 4 Dead 2","icon":"iconhash","community_visible_stats":true,"propagation":"public","app_type":1,"content_descriptorids":[1],"content_descriptorids_including_dlc":[1,2]}]}}`))
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+	resp, err := client.CommunityService.GetApps(context.Background(), []uint32{550, 570})
+	if err != nil {
+		t.Fatalf("GetApps returned error: %v", err)
+	}
+	if len(resp.Response.Apps) != 1 {
+		t.Fatalf("unexpected app count: %d", len(resp.Response.Apps))
+	}
+	if resp.Response.Apps[0].Name != "Left 4 Dead 2" {
+		t.Fatalf("unexpected app name: %s", resp.Response.Apps[0].Name)
+	}
+}
+
+func TestCommunityServiceValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.CommunityService.GetApps(context.Background(), nil)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.CommunityService.GetApps(context.Background(), []uint32{0})
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+}
+
+func TestFamilyGroupsService(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if got := query.Get("family_groupid"); got != "1136785" {
+			t.Fatalf("unexpected family_groupid: %s", got)
+		}
+
+		switch r.URL.Path {
+		case "/IFamilyGroupsService/GetChangeLog/v1/":
+			_, _ = w.Write([]byte(`{"response":{"changes":[{"timestamp":"1700000000","actor_steamid":"1","type":1,"body":"{}","by_support":false}]}}`))
+		case "/IFamilyGroupsService/GetFamilyGroup/v1/":
+			_, _ = w.Write([]byte(`{"response":{"name":"Test Family","members":[{"steamid":"1","role":1,"time_joined":1700000000,"cooldown_seconds_remaining":0}],"free_spots":4,"country":"CN","slot_cooldown_remaining_seconds":0,"slot_cooldown_overrides":0}}`))
+		case "/IFamilyGroupsService/GetFamilyGroupForUser/v1/":
+			if got := query.Get("include_family_group_response"); got != "true" {
+				t.Fatalf("unexpected include_family_group_response: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"family_groupid":"1136785","is_not_member_of_any_group":false,"latest_time_joined":1700000000,"latest_joined_family_groupid":"1136785","role":2,"cooldown_seconds_remaining":0,"family_group":{"name":"Test Family","members":[],"free_spots":4,"country":"CN","slot_cooldown_remaining_seconds":0,"slot_cooldown_overrides":0},"can_undelete_last_joined_family":false,"membership_history":[{"family_groupid":"1136785","rtime_joined":1700000000,"rtime_left":0,"role":2,"participated":true}]}}`))
+		case "/IFamilyGroupsService/GetPlaytimeSummary/v1/":
+			if r.Method != http.MethodPost {
+				t.Fatalf("unexpected method: %s", r.Method)
+			}
+			_, _ = w.Write([]byte(`{"response":{"entries":[{"steamid":"1","appid":550,"first_played":1700000000,"latest_played":1700001000,"seconds_played":600}]}}`))
+		case "/IFamilyGroupsService/GetSharedLibraryApps/v1/":
+			_, _ = w.Write([]byte(`{"response":{"owner_steamid":"1","apps":[{"appid":550,"owner_steamids":["1"],"name":"Left 4 Dead 2","capsule_filename":"capsule.jpg","img_icon_hash":"iconhash","exclude_reason":0,"rt_time_acquired":1700000000,"rt_last_played":1700001000,"rt_playtime":600,"app_type":1}]}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	changeLog, err := client.FamilyGroupsService.GetChangeLog(context.Background(), "1136785")
+	if err != nil {
+		t.Fatalf("GetChangeLog returned error: %v", err)
+	}
+	if len(changeLog.Response.Changes) != 1 {
+		t.Fatalf("unexpected change count: %d", len(changeLog.Response.Changes))
+	}
+
+	familyGroup, err := client.FamilyGroupsService.GetFamilyGroup(context.Background(), "1136785")
+	if err != nil {
+		t.Fatalf("GetFamilyGroup returned error: %v", err)
+	}
+	if familyGroup.Response.Name != "Test Family" {
+		t.Fatalf("unexpected family group name: %s", familyGroup.Response.Name)
+	}
+
+	familyForUser, err := client.FamilyGroupsService.GetFamilyGroupForUser(
+		context.Background(),
+		"1136785",
+		&familygroupsservice.GetFamilyGroupForUserOptions{IncludeFamilyGroupResponse: true},
+	)
+	if err != nil {
+		t.Fatalf("GetFamilyGroupForUser returned error: %v", err)
+	}
+	if familyForUser.Response.FamilyGroupID != "1136785" {
+		t.Fatalf("unexpected family group id: %s", familyForUser.Response.FamilyGroupID)
+	}
+
+	playtime, err := client.FamilyGroupsService.GetPlaytimeSummary(context.Background(), "1136785")
+	if err != nil {
+		t.Fatalf("GetPlaytimeSummary returned error: %v", err)
+	}
+	if len(playtime.Response.Entries) != 1 {
+		t.Fatalf("unexpected playtime count: %d", len(playtime.Response.Entries))
+	}
+
+	sharedApps, err := client.FamilyGroupsService.GetSharedLibraryApps(context.Background(), "1136785")
+	if err != nil {
+		t.Fatalf("GetSharedLibraryApps returned error: %v", err)
+	}
+	if len(sharedApps.Response.Apps) != 1 {
+		t.Fatalf("unexpected shared app count: %d", len(sharedApps.Response.Apps))
+	}
+}
+
+func TestFamilyGroupsServiceValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.FamilyGroupsService.GetChangeLog(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+}
+
+func TestLoyaltyRewardsService(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("steamid"); got != "76561198370695025" {
+			t.Fatalf("unexpected steamid: %s", got)
+		}
+
+		switch r.URL.Path {
+		case "/ILoyaltyRewardsService/GetEquippedProfileItems/v1/":
+			if got := r.URL.Query().Get("language"); got != "zh" {
+				t.Fatalf("unexpected language: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"active_definitions":[{"appid":753,"defid":1,"type":1,"community_item_class":1,"community_item_type":1,"point_cost":"100","timestamp_created":1700000000,"timestamp_updated":1700000001,"timestamp_available":1700000002,"timestamp_available_end":1700000003,"quantity":"1","internal_description":"desc","active":true,"community_item_data":{"item_name":"name","item_title":"title","item_description":"desc","item_image_small":"small.png","item_image_large":"large.png","item_movie_webm":"movie.webm","item_movie_mp4":"movie.mp4","animated":true,"tiled":false},"usable_duration":0,"bundle_discount":0}],"inactive_definitions":[]}}`))
+		case "/ILoyaltyRewardsService/GetReactionsSummaryForUser/v1/":
+			_, _ = w.Write([]byte(`{"response":{"total":[{"reactionid":1,"given":2,"received":3,"points_given":"20","points_received":"30"}],"user_reviews":[],"ugc":[],"profile":[],"total_given":2,"total_received":3,"total_points_given":"20","total_points_received":"30"}}`))
+		case "/ILoyaltyRewardsService/GetSummary/v1/":
+			_, _ = w.Write([]byte(`{"response":{"summary":{"points":"100","points_earned":"200","points_spent":"100"},"timestamp_updated":1700000000,"auditid_highwater":"abc"}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	items, err := client.LoyaltyRewardsService.GetEquippedProfileItems(
+		context.Background(),
+		"76561198370695025",
+		&loyaltyrewardsservice.GetEquippedProfileItemsOptions{Language: "zh"},
+	)
+	if err != nil {
+		t.Fatalf("GetEquippedProfileItems returned error: %v", err)
+	}
+	if len(items.Response.ActiveDefinitions) != 1 {
+		t.Fatalf("unexpected active definition count: %d", len(items.Response.ActiveDefinitions))
+	}
+
+	reactions, err := client.LoyaltyRewardsService.GetReactionsSummaryForUser(context.Background(), "76561198370695025")
+	if err != nil {
+		t.Fatalf("GetReactionsSummaryForUser returned error: %v", err)
+	}
+	if reactions.Response.TotalGiven != 2 {
+		t.Fatalf("unexpected total given: %d", reactions.Response.TotalGiven)
+	}
+
+	summary, err := client.LoyaltyRewardsService.GetSummary(context.Background(), "76561198370695025")
+	if err != nil {
+		t.Fatalf("GetSummary returned error: %v", err)
+	}
+	if summary.Response.Summary.Points != "100" {
+		t.Fatalf("unexpected points: %s", summary.Response.Summary.Points)
+	}
+}
+
+func TestLoyaltyRewardsServiceValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient()
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.LoyaltyRewardsService.GetSummary(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
 func TestSteamUserGetPlayerSummaries(t *testing.T) {
@@ -282,7 +585,7 @@ func TestSteamNewsOptions(t *testing.T) {
 		if got := query.Get("feeds"); got != "steam_community_announcements,steam_blog" {
 			t.Fatalf("unexpected feeds: %s", got)
 		}
-		_, _ = w.Write([]byte(`{"appnews":{"appid":570,"newsitems":[{"gid":"1","title":"update"}],"count":1}}`))
+		_, _ = w.Write([]byte(`{"appnews":{"appid":570,"newsitems":[{"gid":"1","title":"update","tags":["patchnotes"]}],"count":1}}`))
 	}))
 	defer server.Close()
 
@@ -302,6 +605,12 @@ func TestSteamNewsOptions(t *testing.T) {
 	}
 	if resp.AppNews.Count != 1 {
 		t.Fatalf("unexpected news count: %d", resp.AppNews.Count)
+	}
+	if len(resp.AppNews.NewsItems) != 1 {
+		t.Fatalf("unexpected news item count: %d", len(resp.AppNews.NewsItems))
+	}
+	if len(resp.AppNews.NewsItems[0].Tags) != 1 || resp.AppNews.NewsItems[0].Tags[0] != "patchnotes" {
+		t.Fatalf("unexpected tags: %#v", resp.AppNews.NewsItems[0].Tags)
 	}
 }
 

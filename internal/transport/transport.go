@@ -9,12 +9,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Logger matches the root logger contract.
-type Logger interface {
-	Debug(msg string, args ...any)
-	Error(msg string, args ...any)
-}
-
 // ProxySelector chooses a proxy for a request.
 type ProxySelector interface {
 	Next(req *http.Request) (*url.URL, error)
@@ -24,11 +18,10 @@ type ProxySelector interface {
 type Client struct {
 	httpClient *http.Client
 	limiter    *rate.Limiter
-	logger     Logger
 }
 
 // New creates a transport client.
-func New(httpClient *http.Client, requestsPerSecond int, logger Logger) *Client {
+func New(httpClient *http.Client, requestsPerSecond int) *Client {
 	var limiter *rate.Limiter
 	if requestsPerSecond > 0 {
 		limiter = rate.NewLimiter(rate.Limit(requestsPerSecond), requestsPerSecond)
@@ -36,7 +29,6 @@ func New(httpClient *http.Client, requestsPerSecond int, logger Logger) *Client 
 	return &Client{
 		httpClient: httpClient,
 		limiter:    limiter,
-		logger:     logger,
 	}
 }
 

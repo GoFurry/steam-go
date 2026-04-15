@@ -3,6 +3,11 @@ package steam
 import (
 	"net/http"
 
+	"github.com/GoFurry/steam-go/api/accountcartservice"
+	"github.com/GoFurry/steam-go/api/billingservice"
+	"github.com/GoFurry/steam-go/api/communityservice"
+	"github.com/GoFurry/steam-go/api/familygroupsservice"
+	"github.com/GoFurry/steam-go/api/loyaltyrewardsservice"
 	"github.com/GoFurry/steam-go/api/playerservice"
 	"github.com/GoFurry/steam-go/api/steamnews"
 	"github.com/GoFurry/steam-go/api/steamuser"
@@ -13,10 +18,15 @@ import (
 
 // Client is the root Steam Web API entrypoint.
 type Client struct {
-	SteamUser      *steamuser.Service
-	PlayerService  *playerservice.Service
-	SteamNews      *steamnews.Service
-	SteamUserStats *steamuserstats.Service
+	AccountCartService    *accountcartservice.Service
+	BillingService        *billingservice.Service
+	CommunityService      *communityservice.Service
+	FamilyGroupsService   *familygroupsservice.Service
+	LoyaltyRewardsService *loyaltyrewardsservice.Service
+	SteamUser             *steamuser.Service
+	PlayerService         *playerservice.Service
+	SteamNews             *steamnews.Service
+	SteamUserStats        *steamuserstats.Service
 
 	httpClient *http.Client
 }
@@ -31,8 +41,8 @@ func NewClient(opts ...Option) (*Client, error) {
 	}
 
 	httpClient := buildHTTPClient(cfg)
-	rt := transport.New(httpClient, cfg.rateLimit, cfg.logger)
-	executor, err := request.NewExecutor(cfg.baseURL, cfg.apiKeyProvider, cfg.accessTokenProvider, cfg.retry, rt, cfg.logger)
+	rt := transport.New(httpClient, cfg.rateLimit)
+	executor, err := request.NewExecutor(cfg.baseURL, cfg.apiKeyProvider, cfg.accessTokenProvider, cfg.retry, rt)
 	if err != nil {
 		return nil, err
 	}
@@ -40,6 +50,11 @@ func NewClient(opts ...Option) (*Client, error) {
 	client := &Client{
 		httpClient: httpClient,
 	}
+	client.AccountCartService = accountcartservice.NewService(executor)
+	client.BillingService = billingservice.NewService(executor)
+	client.CommunityService = communityservice.NewService(executor)
+	client.FamilyGroupsService = familygroupsservice.NewService(executor)
+	client.LoyaltyRewardsService = loyaltyrewardsservice.NewService(executor)
 	client.SteamUser = steamuser.NewService(executor)
 	client.PlayerService = playerservice.NewService(executor)
 	client.SteamNews = steamnews.NewService(executor)

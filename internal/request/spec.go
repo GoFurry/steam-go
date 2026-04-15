@@ -15,12 +15,6 @@ import (
 
 const defaultUserAgent = "steam-go/1"
 
-// Logger matches the root logger contract.
-type Logger interface {
-	Debug(msg string, args ...any)
-	Error(msg string, args ...any)
-}
-
 // Transport is the request executor used by the SDK.
 type Transport interface {
 	Do(ctx context.Context, req *http.Request) (*http.Response, error)
@@ -41,11 +35,10 @@ type Executor struct {
 	accessTokenProvider auth.AccessTokenProvider
 	retry               int
 	transport           Transport
-	logger              Logger
 }
 
 // NewExecutor creates a request executor.
-func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, transport Transport, logger Logger) (*Executor, error) {
+func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, transport Transport) (*Executor, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "invalid base url", nil, err)
@@ -56,7 +49,6 @@ func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessToken
 		accessTokenProvider: accessTokenProvider,
 		retry:               retry,
 		transport:           transport,
-		logger:              logger,
 	}, nil
 }
 

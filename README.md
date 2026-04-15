@@ -4,8 +4,8 @@
 
 ## Features
 
-- Root `Client` with service-oriented access to `SteamUser`, `PlayerService`, `SteamNews`, and `SteamUserStats`
-- Functional options for API key, access token, timeout, retry, rate limit, proxy selection, and logger injection
+- Root `Client` with service-oriented access to `AccountCartService`, `BillingService`, `CommunityService`, `FamilyGroupsService`, `LoyaltyRewardsService`, `SteamUser`, `PlayerService`, `SteamNews`, and `SteamUserStats`
+- Functional options for API key, access token, timeout, retry, rate limit, and proxy selection
 - `key` and `access_token` are treated as different credentials and can be configured independently
 - API key is optional and can be supplied through a rotating key provider
 - Typed responses by default with matching raw response methods
@@ -18,6 +18,12 @@
 ```bash
 go get github.com/GoFurry/steam-go@latest
 ```
+
+## Go Version Policy
+
+- `go.mod` is pinned to `Go 1.24`
+- The project supports `Go 1.24+`
+- CI continuously validates `Go 1.24` and `Go 1.25`
 
 ## Quick start
 
@@ -58,6 +64,30 @@ func main() {
 
 ## API overview
 
+- `client.AccountCartService.GetCart(ctx, opts)`
+- `client.AccountCartService.GetCartRaw(ctx, opts)`
+- `client.AccountCartService.DeleteCart(ctx)`
+- `client.AccountCartService.DeleteCartRaw(ctx)`
+- `client.BillingService.GetRecurringSubscriptionsCount(ctx)`
+- `client.BillingService.GetRecurringSubscriptionsCountRaw(ctx)`
+- `client.CommunityService.GetApps(ctx, appIDs)`
+- `client.CommunityService.GetAppsRaw(ctx, appIDs)`
+- `client.FamilyGroupsService.GetChangeLog(ctx, familyGroupID)`
+- `client.FamilyGroupsService.GetChangeLogRaw(ctx, familyGroupID)`
+- `client.FamilyGroupsService.GetFamilyGroup(ctx, familyGroupID)`
+- `client.FamilyGroupsService.GetFamilyGroupRaw(ctx, familyGroupID)`
+- `client.FamilyGroupsService.GetFamilyGroupForUser(ctx, familyGroupID, opts)`
+- `client.FamilyGroupsService.GetFamilyGroupForUserRaw(ctx, familyGroupID, opts)`
+- `client.FamilyGroupsService.GetPlaytimeSummary(ctx, familyGroupID)`
+- `client.FamilyGroupsService.GetPlaytimeSummaryRaw(ctx, familyGroupID)`
+- `client.FamilyGroupsService.GetSharedLibraryApps(ctx, familyGroupID)`
+- `client.FamilyGroupsService.GetSharedLibraryAppsRaw(ctx, familyGroupID)`
+- `client.LoyaltyRewardsService.GetEquippedProfileItems(ctx, steamID, opts)`
+- `client.LoyaltyRewardsService.GetEquippedProfileItemsRaw(ctx, steamID, opts)`
+- `client.LoyaltyRewardsService.GetReactionsSummaryForUser(ctx, steamID)`
+- `client.LoyaltyRewardsService.GetReactionsSummaryForUserRaw(ctx, steamID)`
+- `client.LoyaltyRewardsService.GetSummary(ctx, steamID)`
+- `client.LoyaltyRewardsService.GetSummaryRaw(ctx, steamID)`
 - `client.SteamUser.GetPlayerSummaries(ctx, steamIDs)`
 - `client.SteamUser.GetPlayerSummariesRaw(ctx, steamIDs)`
 - `client.PlayerService.GetOwnedGames(ctx, steamID, opts)`
@@ -81,7 +111,6 @@ func main() {
 - `WithRetry(retry int)`
 - `WithRateLimit(requestsPerSecond int)`
 - `WithProxySelector(selector ProxySelector)`
-- `WithLogger(logger Logger)`
 
 ## Error handling
 
@@ -101,3 +130,4 @@ Use `errors.As(err, &apiErr)` to inspect kind, status code, and raw body.
 - [playerservice](examples/playerservice/main.go)
 - [steamnews](examples/steamnews/main.go)
 - [steamuserstats](examples/steamuserstats/main.go)
+- Local manual scenario runner: `test/main.go`
