@@ -4,7 +4,7 @@
 
 ## Features
 
-- Root `Client` with service-oriented access to `AccountCartService`, `BillingService`, `CommunityService`, `FamilyGroupsService`, `LoyaltyRewardsService`, `SteamUser`, `PlayerService`, `SteamNews`, and `SteamUserStats`
+- Root `Client` with grouped service access under `client.API.*`
 - Functional options for API key, access token, timeout, retry, rate limit, and proxy selection
 - `key` and `access_token` are treated as different credentials and can be configured independently
 - API key is optional and can be supplied through a rotating key provider
@@ -48,7 +48,7 @@ func main() {
 	}
 	defer client.Close()
 
-	resp, err := client.SteamUser.GetPlayerSummaries(
+	resp, err := client.API.SteamUser.GetPlayerSummaries(
 		context.Background(),
 		[]string{"76561197960435530"},
 	)
@@ -64,38 +64,38 @@ func main() {
 
 ## API overview
 
-- `client.AccountCartService.GetCart(ctx, opts)`
-- `client.AccountCartService.GetCartRaw(ctx, opts)`
-- `client.AccountCartService.DeleteCart(ctx)`
-- `client.AccountCartService.DeleteCartRaw(ctx)`
-- `client.BillingService.GetRecurringSubscriptionsCount(ctx)`
-- `client.BillingService.GetRecurringSubscriptionsCountRaw(ctx)`
-- `client.CommunityService.GetApps(ctx, appIDs)`
-- `client.CommunityService.GetAppsRaw(ctx, appIDs)`
-- `client.FamilyGroupsService.GetChangeLog(ctx, familyGroupID)`
-- `client.FamilyGroupsService.GetChangeLogRaw(ctx, familyGroupID)`
-- `client.FamilyGroupsService.GetFamilyGroup(ctx, familyGroupID)`
-- `client.FamilyGroupsService.GetFamilyGroupRaw(ctx, familyGroupID)`
-- `client.FamilyGroupsService.GetFamilyGroupForUser(ctx, familyGroupID, opts)`
-- `client.FamilyGroupsService.GetFamilyGroupForUserRaw(ctx, familyGroupID, opts)`
-- `client.FamilyGroupsService.GetPlaytimeSummary(ctx, familyGroupID)`
-- `client.FamilyGroupsService.GetPlaytimeSummaryRaw(ctx, familyGroupID)`
-- `client.FamilyGroupsService.GetSharedLibraryApps(ctx, familyGroupID)`
-- `client.FamilyGroupsService.GetSharedLibraryAppsRaw(ctx, familyGroupID)`
-- `client.LoyaltyRewardsService.GetEquippedProfileItems(ctx, steamID, opts)`
-- `client.LoyaltyRewardsService.GetEquippedProfileItemsRaw(ctx, steamID, opts)`
-- `client.LoyaltyRewardsService.GetReactionsSummaryForUser(ctx, steamID)`
-- `client.LoyaltyRewardsService.GetReactionsSummaryForUserRaw(ctx, steamID)`
-- `client.LoyaltyRewardsService.GetSummary(ctx, steamID)`
-- `client.LoyaltyRewardsService.GetSummaryRaw(ctx, steamID)`
-- `client.SteamUser.GetPlayerSummaries(ctx, steamIDs)`
-- `client.SteamUser.GetPlayerSummariesRaw(ctx, steamIDs)`
-- `client.PlayerService.GetOwnedGames(ctx, steamID, opts)`
-- `client.PlayerService.GetOwnedGamesRaw(ctx, steamID, opts)`
-- `client.SteamNews.GetNewsForApp(ctx, appID, opts)`
-- `client.SteamNews.GetNewsForAppRaw(ctx, appID, opts)`
-- `client.SteamUserStats.GetPlayerAchievements(ctx, steamID, appID, opts)`
-- `client.SteamUserStats.GetPlayerAchievementsRaw(ctx, steamID, appID, opts)`
+- `client.API.AccountCartService.GetCart(ctx, opts)`
+- `client.API.AccountCartService.GetCartRaw(ctx, opts)`
+- `client.API.AccountCartService.DeleteCart(ctx)`
+- `client.API.AccountCartService.DeleteCartRaw(ctx)`
+- `client.API.BillingService.GetRecurringSubscriptionsCount(ctx)`
+- `client.API.BillingService.GetRecurringSubscriptionsCountRaw(ctx)`
+- `client.API.CommunityService.GetApps(ctx, appIDs)`
+- `client.API.CommunityService.GetAppsRaw(ctx, appIDs)`
+- `client.API.FamilyGroupsService.GetChangeLog(ctx, familyGroupID)`
+- `client.API.FamilyGroupsService.GetChangeLogRaw(ctx, familyGroupID)`
+- `client.API.FamilyGroupsService.GetFamilyGroup(ctx, familyGroupID)`
+- `client.API.FamilyGroupsService.GetFamilyGroupRaw(ctx, familyGroupID)`
+- `client.API.FamilyGroupsService.GetFamilyGroupForUser(ctx, familyGroupID, opts)`
+- `client.API.FamilyGroupsService.GetFamilyGroupForUserRaw(ctx, familyGroupID, opts)`
+- `client.API.FamilyGroupsService.GetPlaytimeSummary(ctx, familyGroupID)`
+- `client.API.FamilyGroupsService.GetPlaytimeSummaryRaw(ctx, familyGroupID)`
+- `client.API.FamilyGroupsService.GetSharedLibraryApps(ctx, familyGroupID)`
+- `client.API.FamilyGroupsService.GetSharedLibraryAppsRaw(ctx, familyGroupID)`
+- `client.API.LoyaltyRewardsService.GetEquippedProfileItems(ctx, steamID, opts)`
+- `client.API.LoyaltyRewardsService.GetEquippedProfileItemsRaw(ctx, steamID, opts)`
+- `client.API.LoyaltyRewardsService.GetReactionsSummaryForUser(ctx, steamID)`
+- `client.API.LoyaltyRewardsService.GetReactionsSummaryForUserRaw(ctx, steamID)`
+- `client.API.LoyaltyRewardsService.GetSummary(ctx, steamID)`
+- `client.API.LoyaltyRewardsService.GetSummaryRaw(ctx, steamID)`
+- `client.API.SteamUser.GetPlayerSummaries(ctx, steamIDs)`
+- `client.API.SteamUser.GetPlayerSummariesRaw(ctx, steamIDs)`
+- `client.API.PlayerService.GetOwnedGames(ctx, steamID, opts)`
+- `client.API.PlayerService.GetOwnedGamesRaw(ctx, steamID, opts)`
+- `client.API.SteamNews.GetNewsForApp(ctx, appID, opts)`
+- `client.API.SteamNews.GetNewsForAppRaw(ctx, appID, opts)`
+- `client.API.SteamUserStats.GetPlayerAchievements(ctx, steamID, appID, opts)`
+- `client.API.SteamUserStats.GetPlayerAchievementsRaw(ctx, steamID, appID, opts)`
 
 ## Options
 

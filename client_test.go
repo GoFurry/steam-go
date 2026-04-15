@@ -29,10 +29,13 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	if client == nil {
 		t.Fatal("expected client")
 	}
-	if client.AccountCartService == nil || client.BillingService == nil || client.CommunityService == nil {
+	if client.API == nil {
+		t.Fatal("expected api entrypoint")
+	}
+	if client.API.AccountCartService == nil || client.API.BillingService == nil || client.API.CommunityService == nil {
 		t.Fatal("expected new core services to be initialized")
 	}
-	if client.FamilyGroupsService == nil || client.LoyaltyRewardsService == nil {
+	if client.API.FamilyGroupsService == nil || client.API.LoyaltyRewardsService == nil {
 		t.Fatal("expected access-token services to be initialized")
 	}
 }
@@ -62,7 +65,7 @@ func TestAccountCartServiceGetCart(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	resp, err := client.AccountCartService.GetCart(context.Background(), &accountcartservice.GetCartOptions{UserCountry: "gb"})
+	resp, err := client.API.AccountCartService.GetCart(context.Background(), &accountcartservice.GetCartOptions{UserCountry: "gb"})
 	if err != nil {
 		t.Fatalf("GetCart returned error: %v", err)
 	}
@@ -96,7 +99,7 @@ func TestAccountCartServiceDeleteCart(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.AccountCartService.DeleteCart(context.Background())
+	_, err = client.API.AccountCartService.DeleteCart(context.Background())
 	if err != nil {
 		t.Fatalf("DeleteCart returned error: %v", err)
 	}
@@ -121,7 +124,7 @@ func TestBillingServiceGetRecurringSubscriptionsCount(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	resp, err := client.BillingService.GetRecurringSubscriptionsCount(context.Background())
+	resp, err := client.API.BillingService.GetRecurringSubscriptionsCount(context.Background())
 	if err != nil {
 		t.Fatalf("GetRecurringSubscriptionsCount returned error: %v", err)
 	}
@@ -146,7 +149,7 @@ func TestCommunityServiceGetApps(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	resp, err := client.CommunityService.GetApps(context.Background(), []uint32{550, 570})
+	resp, err := client.API.CommunityService.GetApps(context.Background(), []uint32{550, 570})
 	if err != nil {
 		t.Fatalf("GetApps returned error: %v", err)
 	}
@@ -166,10 +169,10 @@ func TestCommunityServiceValidation(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.CommunityService.GetApps(context.Background(), nil)
+	_, err = client.API.CommunityService.GetApps(context.Background(), nil)
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 
-	_, err = client.CommunityService.GetApps(context.Background(), []uint32{0})
+	_, err = client.API.CommunityService.GetApps(context.Background(), []uint32{0})
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
@@ -207,7 +210,7 @@ func TestFamilyGroupsService(t *testing.T) {
 
 	client := newTestClient(t, server.URL)
 
-	changeLog, err := client.FamilyGroupsService.GetChangeLog(context.Background(), "1136785")
+	changeLog, err := client.API.FamilyGroupsService.GetChangeLog(context.Background(), "1136785")
 	if err != nil {
 		t.Fatalf("GetChangeLog returned error: %v", err)
 	}
@@ -215,7 +218,7 @@ func TestFamilyGroupsService(t *testing.T) {
 		t.Fatalf("unexpected change count: %d", len(changeLog.Response.Changes))
 	}
 
-	familyGroup, err := client.FamilyGroupsService.GetFamilyGroup(context.Background(), "1136785")
+	familyGroup, err := client.API.FamilyGroupsService.GetFamilyGroup(context.Background(), "1136785")
 	if err != nil {
 		t.Fatalf("GetFamilyGroup returned error: %v", err)
 	}
@@ -223,7 +226,7 @@ func TestFamilyGroupsService(t *testing.T) {
 		t.Fatalf("unexpected family group name: %s", familyGroup.Response.Name)
 	}
 
-	familyForUser, err := client.FamilyGroupsService.GetFamilyGroupForUser(
+	familyForUser, err := client.API.FamilyGroupsService.GetFamilyGroupForUser(
 		context.Background(),
 		"1136785",
 		&familygroupsservice.GetFamilyGroupForUserOptions{IncludeFamilyGroupResponse: true},
@@ -235,7 +238,7 @@ func TestFamilyGroupsService(t *testing.T) {
 		t.Fatalf("unexpected family group id: %s", familyForUser.Response.FamilyGroupID)
 	}
 
-	playtime, err := client.FamilyGroupsService.GetPlaytimeSummary(context.Background(), "1136785")
+	playtime, err := client.API.FamilyGroupsService.GetPlaytimeSummary(context.Background(), "1136785")
 	if err != nil {
 		t.Fatalf("GetPlaytimeSummary returned error: %v", err)
 	}
@@ -243,7 +246,7 @@ func TestFamilyGroupsService(t *testing.T) {
 		t.Fatalf("unexpected playtime count: %d", len(playtime.Response.Entries))
 	}
 
-	sharedApps, err := client.FamilyGroupsService.GetSharedLibraryApps(context.Background(), "1136785")
+	sharedApps, err := client.API.FamilyGroupsService.GetSharedLibraryApps(context.Background(), "1136785")
 	if err != nil {
 		t.Fatalf("GetSharedLibraryApps returned error: %v", err)
 	}
@@ -260,7 +263,7 @@ func TestFamilyGroupsServiceValidation(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.FamilyGroupsService.GetChangeLog(context.Background(), "")
+	_, err = client.API.FamilyGroupsService.GetChangeLog(context.Background(), "")
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
@@ -290,7 +293,7 @@ func TestLoyaltyRewardsService(t *testing.T) {
 
 	client := newTestClient(t, server.URL)
 
-	items, err := client.LoyaltyRewardsService.GetEquippedProfileItems(
+	items, err := client.API.LoyaltyRewardsService.GetEquippedProfileItems(
 		context.Background(),
 		"76561198370695025",
 		&loyaltyrewardsservice.GetEquippedProfileItemsOptions{Language: "zh"},
@@ -302,7 +305,7 @@ func TestLoyaltyRewardsService(t *testing.T) {
 		t.Fatalf("unexpected active definition count: %d", len(items.Response.ActiveDefinitions))
 	}
 
-	reactions, err := client.LoyaltyRewardsService.GetReactionsSummaryForUser(context.Background(), "76561198370695025")
+	reactions, err := client.API.LoyaltyRewardsService.GetReactionsSummaryForUser(context.Background(), "76561198370695025")
 	if err != nil {
 		t.Fatalf("GetReactionsSummaryForUser returned error: %v", err)
 	}
@@ -310,7 +313,7 @@ func TestLoyaltyRewardsService(t *testing.T) {
 		t.Fatalf("unexpected total given: %d", reactions.Response.TotalGiven)
 	}
 
-	summary, err := client.LoyaltyRewardsService.GetSummary(context.Background(), "76561198370695025")
+	summary, err := client.API.LoyaltyRewardsService.GetSummary(context.Background(), "76561198370695025")
 	if err != nil {
 		t.Fatalf("GetSummary returned error: %v", err)
 	}
@@ -327,7 +330,7 @@ func TestLoyaltyRewardsServiceValidation(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.LoyaltyRewardsService.GetSummary(context.Background(), "")
+	_, err = client.API.LoyaltyRewardsService.GetSummary(context.Background(), "")
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
@@ -350,7 +353,7 @@ func TestSteamUserGetPlayerSummaries(t *testing.T) {
 
 	client := newTestClient(t, server.URL)
 
-	resp, err := client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1", "2"})
+	resp, err := client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1", "2"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummaries returned error: %v", err)
 	}
@@ -378,7 +381,7 @@ func TestSteamUserGetPlayerSummariesWithoutAPIKey(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	resp, err := client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	resp, err := client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummaries returned error: %v", err)
 	}
@@ -410,7 +413,7 @@ func TestSteamUserGetPlayerSummariesWithAccessToken(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummaries returned error: %v", err)
 	}
@@ -441,7 +444,7 @@ func TestSteamUserGetPlayerSummariesWithRotatingAPIKeys(t *testing.T) {
 	}
 
 	for i := 0; i < 2; i++ {
-		_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+		_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 		if err != nil {
 			t.Fatalf("GetPlayerSummaries returned error: %v", err)
 		}
@@ -474,7 +477,7 @@ func TestSteamUserGetPlayerSummariesWithRotatingAccessTokens(t *testing.T) {
 	}
 
 	for i := 0; i < 2; i++ {
-		_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+		_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 		if err != nil {
 			t.Fatalf("GetPlayerSummaries returned error: %v", err)
 		}
@@ -497,7 +500,7 @@ func TestSteamUserGetPlayerSummariesRaw(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	body, err := client.SteamUser.GetPlayerSummariesRaw(context.Background(), []string{"1"})
+	body, err := client.API.SteamUser.GetPlayerSummariesRaw(context.Background(), []string{"1"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummariesRaw returned error: %v", err)
 	}
@@ -514,14 +517,14 @@ func TestSteamUserValidation(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), nil)
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), nil)
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 
 	tooMany := make([]string, 101)
 	for i := range tooMany {
 		tooMany[i] = "1"
 	}
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), tooMany)
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), tooMany)
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
@@ -545,7 +548,7 @@ func TestPlayerServiceOptions(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	resp, err := client.PlayerService.GetOwnedGames(
+	resp, err := client.API.PlayerService.GetOwnedGames(
 		context.Background(),
 		"76561197960435530",
 		&playerservice.GetOwnedGamesOptions{
@@ -590,7 +593,7 @@ func TestSteamNewsOptions(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	resp, err := client.SteamNews.GetNewsForApp(
+	resp, err := client.API.SteamNews.GetNewsForApp(
 		context.Background(),
 		570,
 		&steamnews.GetNewsForAppOptions{
@@ -633,7 +636,7 @@ func TestSteamUserStatsGetPlayerAchievements(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	resp, err := client.SteamUserStats.GetPlayerAchievements(
+	resp, err := client.API.SteamUserStats.GetPlayerAchievements(
 		context.Background(),
 		"76561197960435530",
 		550,
@@ -662,7 +665,7 @@ func TestSteamUserStatsGetPlayerAchievementsRaw(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	body, err := client.SteamUserStats.GetPlayerAchievementsRaw(context.Background(), "1", 550, nil)
+	body, err := client.API.SteamUserStats.GetPlayerAchievementsRaw(context.Background(), "1", 550, nil)
 	if err != nil {
 		t.Fatalf("GetPlayerAchievementsRaw returned error: %v", err)
 	}
@@ -679,10 +682,10 @@ func TestSteamUserStatsValidation(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUserStats.GetPlayerAchievements(context.Background(), "", 550, nil)
+	_, err = client.API.SteamUserStats.GetPlayerAchievements(context.Background(), "", 550, nil)
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 
-	_, err = client.SteamUserStats.GetPlayerAchievements(context.Background(), "1", 0, nil)
+	_, err = client.API.SteamUserStats.GetPlayerAchievements(context.Background(), "1", 0, nil)
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
@@ -695,7 +698,7 @@ func TestSteamUserStatsAPIResponseError(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	_, err := client.SteamUserStats.GetPlayerAchievements(context.Background(), "1", 550, nil)
+	_, err := client.API.SteamUserStats.GetPlayerAchievements(context.Background(), "1", 550, nil)
 	expectKind(t, err, steam.ErrorKindAPIResponse)
 }
 
@@ -708,7 +711,7 @@ func TestHTTPStatusError(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	_, err := client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err := client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	expectKind(t, err, steam.ErrorKindHTTPStatus)
 }
 
@@ -721,7 +724,7 @@ func TestDecodeError(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	_, err := client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err := client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	expectKind(t, err, steam.ErrorKindDecode)
 }
 
@@ -747,7 +750,7 @@ func TestRetryOnServerError(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummaries returned error: %v", err)
 	}
@@ -780,7 +783,7 @@ func TestRetryOnUnauthorizedWithKeyFailover(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummaries returned error: %v", err)
 	}
@@ -816,7 +819,7 @@ func TestRetryOnRateLimitWithKeyFailover(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummaries returned error: %v", err)
 	}
@@ -846,7 +849,7 @@ func TestNoKeyProviderDoesNotRetryOnRateLimit(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	expectKind(t, err, steam.ErrorKindHTTPStatus)
 	if attempts.Load() != 1 {
 		t.Fatalf("unexpected attempts: %d", attempts.Load())
@@ -871,7 +874,7 @@ func TestContextTimeout(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	expectKind(t, err, steam.ErrorKindTransport)
 }
 
@@ -893,7 +896,7 @@ func TestProxySelector(t *testing.T) {
 		t.Fatalf("NewClient returned error: %v", err)
 	}
 
-	_, err = client.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
 	if err != nil {
 		t.Fatalf("GetPlayerSummaries returned error: %v", err)
 	}

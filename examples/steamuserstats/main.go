@@ -26,7 +26,7 @@ func main() {
 	}
 	defer client.Close()
 
-	resp, err := client.SteamUserStats.GetPlayerAchievements(
+	resp, err := client.API.SteamUserStats.GetPlayerAchievements(
 		context.Background(),
 		"76561197960435530",
 		550,

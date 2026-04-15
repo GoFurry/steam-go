@@ -26,7 +26,7 @@ func main() {
 	}
 	defer client.Close()
 
-	resp, err := client.SteamNews.GetNewsForApp(
+	resp, err := client.API.SteamNews.GetNewsForApp(
 		context.Background(),
 		570,
 		&steamnews.GetNewsForAppOptions{Count: 3},

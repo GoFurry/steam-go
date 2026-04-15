@@ -26,7 +26,7 @@ func main() {
 	}
 	defer client.Close()
 
-	resp, err := client.PlayerService.GetOwnedGames(
+	resp, err := client.API.PlayerService.GetOwnedGames(
 		context.Background(),
 		"76561197960435530",
 		&playerservice.GetOwnedGamesOptions{IncludePlayedFreeGames: true},

@@ -25,7 +25,7 @@ func main() {
 	}
 	defer client.Close()
 
-	resp, err := client.SteamUser.GetPlayerSummaries(
+	resp, err := client.API.SteamUser.GetPlayerSummaries(
 		context.Background(),
 		[]string{"76561197960435530"},
 	)

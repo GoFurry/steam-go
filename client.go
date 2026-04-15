@@ -18,6 +18,13 @@ import (
 
 // Client is the root Steam Web API entrypoint.
 type Client struct {
+	API *API
+
+	httpClient *http.Client
+}
+
+// API groups all typed Steam Web API services under one stable entrypoint.
+type API struct {
 	AccountCartService    *accountcartservice.Service
 	BillingService        *billingservice.Service
 	CommunityService      *communityservice.Service
@@ -27,8 +34,6 @@ type Client struct {
 	PlayerService         *playerservice.Service
 	SteamNews             *steamnews.Service
 	SteamUserStats        *steamuserstats.Service
-
-	httpClient *http.Client
 }
 
 // NewClient builds a Steam Web API client using functional options.
@@ -50,15 +55,17 @@ func NewClient(opts ...Option) (*Client, error) {
 	client := &Client{
 		httpClient: httpClient,
 	}
-	client.AccountCartService = accountcartservice.NewService(executor)
-	client.BillingService = billingservice.NewService(executor)
-	client.CommunityService = communityservice.NewService(executor)
-	client.FamilyGroupsService = familygroupsservice.NewService(executor)
-	client.LoyaltyRewardsService = loyaltyrewardsservice.NewService(executor)
-	client.SteamUser = steamuser.NewService(executor)
-	client.PlayerService = playerservice.NewService(executor)
-	client.SteamNews = steamnews.NewService(executor)
-	client.SteamUserStats = steamuserstats.NewService(executor)
+	client.API = &API{
+		AccountCartService:    accountcartservice.NewService(executor),
+		BillingService:        billingservice.NewService(executor),
+		CommunityService:      communityservice.NewService(executor),
+		FamilyGroupsService:   familygroupsservice.NewService(executor),
+		LoyaltyRewardsService: loyaltyrewardsservice.NewService(executor),
+		SteamUser:             steamuser.NewService(executor),
+		PlayerService:         playerservice.NewService(executor),
+		SteamNews:             steamnews.NewService(executor),
+		SteamUserStats:        steamuserstats.NewService(executor),
+	}
 	return client, nil
 }
 
