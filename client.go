@@ -1,0 +1,110 @@
+package steam
+
+import (
+	"net/http"
+
+	"github.com/GoFurry/steam-go/api/accountcartservice"
+	"github.com/GoFurry/steam-go/api/billingservice"
+	"github.com/GoFurry/steam-go/api/communityservice"
+	"github.com/GoFurry/steam-go/api/familygroupsservice"
+	"github.com/GoFurry/steam-go/api/loyaltyrewardsservice"
+	"github.com/GoFurry/steam-go/api/playerservice"
+	"github.com/GoFurry/steam-go/api/steamnews"
+	"github.com/GoFurry/steam-go/api/steamuser"
+	"github.com/GoFurry/steam-go/api/steamuserstats"
+	"github.com/GoFurry/steam-go/internal/request"
+	"github.com/GoFurry/steam-go/internal/transport"
+)
+
+// Client is the root Steam Web API entrypoint.
+type Client struct {
+	API *API
+
+	httpClient *http.Client
+}
+
+// API groups all typed Steam Web API services under one stable entrypoint.
+type API struct {
+	AccountCartService    *accountcartservice.Service
+	BillingService        *billingservice.Service
+	CommunityService      *communityservice.Service
+	FamilyGroupsService   *familygroupsservice.Service
+	LoyaltyRewardsService *loyaltyrewardsservice.Service
+	SteamUser             *steamuser.Service
+	PlayerService         *playerservice.Service
+	SteamNews             *steamnews.Service
+	SteamUserStats        *steamuserstats.Service
+}
+
+// NewClient builds a Steam Web API client using functional options.
+func NewClient(opts ...Option) (*Client, error) {
+	cfg := defaultClientConfig()
+	for _, opt := range opts {
+		if err := opt(&cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	httpClient, err := buildHTTPClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	rt := transport.New(httpClient, cfg.rateLimit)
+	executor, err := request.NewExecutor(
+		cfg.baseURL,
+		cfg.apiKeyProvider,
+		cfg.accessTokenProvider,
+		cfg.retry,
+		cfg.maxResponseBodyBytes,
+		rt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &Client{
+		httpClient: httpClient,
+	}
+	client.API = &API{
+		AccountCartService:    accountcartservice.NewService(executor),
+		BillingService:        billingservice.NewService(executor),
+		CommunityService:      communityservice.NewService(executor),
+		FamilyGroupsService:   familygroupsservice.NewService(executor),
+		LoyaltyRewardsService: loyaltyrewardsservice.NewService(executor),
+		SteamUser:             steamuser.NewService(executor),
+		PlayerService:         playerservice.NewService(executor),
+		SteamNews:             steamnews.NewService(executor),
+		SteamUserStats:        steamuserstats.NewService(executor),
+	}
+	return client, nil
+}
+
+// Close releases idle HTTP connections held by the SDK client.
+func (c *Client) Close() {
+	if c == nil || c.httpClient == nil {
+		return
+	}
+	c.httpClient.CloseIdleConnections()
+}
+
+func buildHTTPClient(cfg clientConfig) (*http.Client, error) {
+	if cfg.httpClient != nil {
+		cloned := *cfg.httpClient
+		cloned.Timeout = cfg.timeout
+		rt, err := transport.WrapRoundTripper(cloned.Transport, cfg.proxySelector)
+		if err != nil {
+			return nil, err
+		}
+		cloned.Transport = rt
+		return &cloned, nil
+	}
+
+	rt, err := transport.WrapRoundTripper(nil, cfg.proxySelector)
+	if err != nil {
+		return nil, err
+	}
+	return &http.Client{
+		Timeout:   cfg.timeout,
+		Transport: rt,
+	}, nil
+}
