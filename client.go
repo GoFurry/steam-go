@@ -45,7 +45,10 @@ func NewClient(opts ...Option) (*Client, error) {
 		}
 	}
 
-	httpClient := buildHTTPClient(cfg)
+	httpClient, err := buildHTTPClient(cfg)
+	if err != nil {
+		return nil, err
+	}
 	rt := transport.New(httpClient, cfg.rateLimit)
 	executor, err := request.NewExecutor(cfg.baseURL, cfg.apiKeyProvider, cfg.accessTokenProvider, cfg.retry, rt)
 	if err != nil {
@@ -77,16 +80,24 @@ func (c *Client) Close() {
 	c.httpClient.CloseIdleConnections()
 }
 
-func buildHTTPClient(cfg clientConfig) *http.Client {
+func buildHTTPClient(cfg clientConfig) (*http.Client, error) {
 	if cfg.httpClient != nil {
 		cloned := *cfg.httpClient
 		cloned.Timeout = cfg.timeout
-		cloned.Transport = transport.WrapRoundTripper(cloned.Transport, cfg.proxySelector)
-		return &cloned
+		rt, err := transport.WrapRoundTripper(cloned.Transport, cfg.proxySelector)
+		if err != nil {
+			return nil, err
+		}
+		cloned.Transport = rt
+		return &cloned, nil
 	}
 
+	rt, err := transport.WrapRoundTripper(nil, cfg.proxySelector)
+	if err != nil {
+		return nil, err
+	}
 	return &http.Client{
 		Timeout:   cfg.timeout,
-		Transport: transport.WrapRoundTripper(nil, cfg.proxySelector),
-	}
+		Transport: rt,
+	}, nil
 }

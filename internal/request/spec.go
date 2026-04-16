@@ -37,6 +37,11 @@ type Executor struct {
 	transport           Transport
 }
 
+type requestCredentials struct {
+	apiKey      string
+	accessToken string
+}
+
 // NewExecutor creates a request executor.
 func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, transport Transport) (*Executor, error) {
 	parsed, err := url.Parse(baseURL)
@@ -64,9 +69,14 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 	relative := &url.URL{Path: spec.Path}
 	resolved := e.baseURL.ResolveReference(relative)
 
+	creds, err := e.resolveCredentials(ctx, spec.Method, resolved)
+	if err != nil {
+		return nil, err
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= e.retry; attempt++ {
-		req, err := e.buildRequest(ctx, resolved, spec)
+		req, err := e.buildRequest(ctx, resolved, spec, creds)
 		if err != nil {
 			return nil, err
 		}
@@ -104,6 +114,12 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 				nil,
 			)
 			if shouldRetryStatus(resp.StatusCode, e.apiKeyProvider != nil) && attempt < e.retry {
+				if shouldRotateAPIKey(resp.StatusCode, e.apiKeyProvider != nil) {
+					creds.apiKey, err = e.resolveAPIKey(req)
+					if err != nil {
+						return nil, err
+					}
+				}
 				if !sleepBeforeRetry(ctx, attempt) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
@@ -119,6 +135,27 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 		lastErr = sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, nil)
 	}
 	return nil, lastErr
+}
+
+func (e *Executor) resolveCredentials(ctx context.Context, method string, resolved *url.URL) (requestCredentials, error) {
+	req, err := http.NewRequestWithContext(ctx, method, resolved.String(), nil)
+	if err != nil {
+		return requestCredentials{}, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "build request failed", nil, err)
+	}
+
+	apiKey, err := e.resolveAPIKey(req)
+	if err != nil {
+		return requestCredentials{}, err
+	}
+	accessToken, err := e.resolveAccessToken(req)
+	if err != nil {
+		return requestCredentials{}, err
+	}
+
+	return requestCredentials{
+		apiKey:      apiKey,
+		accessToken: accessToken,
+	}, nil
 }
 
 func (e *Executor) resolveAPIKey(req *http.Request) (string, error) {
@@ -145,21 +182,13 @@ func (e *Executor) resolveAccessToken(req *http.Request) (string, error) {
 	return accessToken, nil
 }
 
-func (e *Executor) buildRequest(ctx context.Context, resolved *url.URL, spec RequestSpec) (*http.Request, error) {
+func (e *Executor) buildRequest(ctx context.Context, resolved *url.URL, spec RequestSpec, creds requestCredentials) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, spec.Method, resolved.String(), nil)
 	if err != nil {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "build request failed", nil, err)
 	}
 
-	apiKey, err := e.resolveAPIKey(req)
-	if err != nil {
-		return nil, err
-	}
-	accessToken, err := e.resolveAccessToken(req)
-	if err != nil {
-		return nil, err
-	}
-	query := auth.InjectCredentials(spec.Query, apiKey, accessToken)
+	query := auth.InjectCredentials(spec.Query, creds.apiKey, creds.accessToken)
 	req.URL.RawQuery = query.Encode()
 
 	req.Header.Set("User-Agent", defaultUserAgent)
@@ -188,6 +217,13 @@ func shouldRetryStatus(statusCode int, hasAPIKeyProvider bool) bool {
 	if statusCode >= http.StatusInternalServerError {
 		return true
 	}
+	if !hasAPIKeyProvider {
+		return false
+	}
+	return statusCode == http.StatusUnauthorized || statusCode == http.StatusTooManyRequests
+}
+
+func shouldRotateAPIKey(statusCode int, hasAPIKeyProvider bool) bool {
 	if !hasAPIKeyProvider {
 		return false
 	}

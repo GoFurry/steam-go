@@ -2,12 +2,13 @@ package transport
 
 import (
 	"context"
-	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -54,8 +55,12 @@ func TestWrapRoundTripperSupportsHTTPSProxy(t *testing.T) {
 	}
 
 	base := target.Client().Transport.(*http.Transport)
+	rt, err := WrapRoundTripper(base, staticProxySelector{url: proxyURL})
+	if err != nil {
+		t.Fatalf("WrapRoundTripper returned error: %v", err)
+	}
 	client := &http.Client{
-		Transport: WrapRoundTripper(base, staticProxySelector{url: proxyURL}),
+		Transport: rt,
 	}
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, target.URL, nil)
@@ -81,6 +86,44 @@ func TestWrapRoundTripperSupportsHTTPSProxy(t *testing.T) {
 	}
 }
 
+func TestWrapRoundTripperPreservesCustomRoundTripperWithoutSelector(t *testing.T) {
+	t.Parallel()
+
+	custom := roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNoContent,
+			Body:       io.NopCloser(strings.NewReader("")),
+			Header:     make(http.Header),
+		}, nil
+	})
+
+	rt, err := WrapRoundTripper(custom, nil)
+	if err != nil {
+		t.Fatalf("WrapRoundTripper returned error: %v", err)
+	}
+
+	resp, err := rt.RoundTrip(httptest.NewRequest(http.MethodGet, "https://example.com", nil))
+	if err != nil {
+		t.Fatalf("RoundTrip returned error: %v", err)
+	}
+	if got, want := resp.StatusCode, http.StatusNoContent; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+}
+
+func TestWrapRoundTripperRejectsCustomRoundTripperWithProxySelector(t *testing.T) {
+	t.Parallel()
+
+	custom := roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("should not be called")
+	})
+
+	_, err := WrapRoundTripper(custom, staticProxySelector{url: &url.URL{Scheme: "http", Host: "127.0.0.1:7897"}})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func proxyCopy(dst net.Conn, src net.Conn) {
 	_, _ = io.Copy(dst, src)
 	_ = dst.Close()
@@ -95,40 +138,8 @@ func (s staticProxySelector) Next(*http.Request) (*url.URL, error) {
 	return s.url, nil
 }
 
-func TestCloneTransportCopiesConfig(t *testing.T) {
-	t.Parallel()
+type roundTripperFunc func(*http.Request) (*http.Response, error)
 
-	base := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		TLSClientConfig: &tls.Config{
-			ServerName: "example.com",
-		},
-		ProxyConnectHeader: http.Header{
-			"X-Test": []string{"value"},
-		},
-		TLSNextProto: map[string]func(string, *tls.Conn) http.RoundTripper{
-			"h2": func(string, *tls.Conn) http.RoundTripper { return nil },
-		},
-	}
-
-	cloned := cloneTransport(base)
-	if cloned == base {
-		t.Fatal("expected a distinct transport instance")
-	}
-	if cloned.TLSClientConfig == base.TLSClientConfig {
-		t.Fatal("expected TLSClientConfig to be cloned")
-	}
-	if cloned.ProxyConnectHeader == nil || cloned.ProxyConnectHeader.Get("X-Test") != "value" {
-		t.Fatalf("unexpected ProxyConnectHeader: %#v", cloned.ProxyConnectHeader)
-	}
-	cloned.ProxyConnectHeader.Set("X-Test", "changed")
-	if got, want := base.ProxyConnectHeader.Get("X-Test"), "value"; got != want {
-		t.Fatalf("base ProxyConnectHeader mutated: got %q want %q", got, want)
-	}
-	if cloned.TLSNextProto == nil || len(cloned.TLSNextProto) != 1 {
-		t.Fatalf("unexpected TLSNextProto: %#v", cloned.TLSNextProto)
-	}
-	if &cloned.TLSNextProto == &base.TLSNextProto {
-		t.Fatal("expected TLSNextProto map to be copied")
-	}
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

@@ -2,7 +2,7 @@ package transport
 
 import (
 	"context"
-	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -44,25 +44,32 @@ func (c *Client) Do(ctx context.Context, req *http.Request) (*http.Response, err
 }
 
 // WrapRoundTripper installs proxy selection on top of an existing transport.
-func WrapRoundTripper(rt http.RoundTripper, selector ProxySelector) http.RoundTripper {
-	base := baseTransport(rt)
+func WrapRoundTripper(rt http.RoundTripper, selector ProxySelector) (http.RoundTripper, error) {
 	if selector == nil {
-		return base
+		if rt != nil {
+			return rt, nil
+		}
+		return defaultTransport(), nil
 	}
-	return &proxyRoundTripper{
-		base:     base,
-		selector: selector,
+
+	base, err := baseTransport(rt)
+	if err != nil {
+		return nil, err
 	}
+	base.Proxy = func(req *http.Request) (*url.URL, error) {
+		return selector.Next(req)
+	}
+	return base, nil
 }
 
-func baseTransport(rt http.RoundTripper) *http.Transport {
+func baseTransport(rt http.RoundTripper) (*http.Transport, error) {
 	if rt == nil {
-		return defaultTransport()
+		return defaultTransport(), nil
 	}
 	if transport, ok := rt.(*http.Transport); ok {
-		return transport.Clone()
+		return transport.Clone(), nil
 	}
-	return defaultTransport()
+	return nil, fmt.Errorf("proxy selector requires an *http.Transport or nil transport, got %T", rt)
 }
 
 func defaultTransport() *http.Transport {
@@ -73,54 +80,4 @@ func defaultTransport() *http.Transport {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-}
-
-type proxyRoundTripper struct {
-	base     *http.Transport
-	selector ProxySelector
-}
-
-func (p *proxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if p.selector == nil {
-		return p.base.RoundTrip(req)
-	}
-
-	proxyURL, err := p.selector.Next(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// A fresh struct copy is used here instead of (*http.Transport).Clone().
-	// In practice some local HTTP proxies are compatible with a directly
-	// configured transport but break when a cloned transport has its Proxy
-	// field swapped per request.
-	transport := cloneTransport(p.base)
-	if proxyURL == nil {
-		transport.Proxy = nil
-	} else {
-		transport.Proxy = http.ProxyURL(proxyURL)
-	}
-	return transport.RoundTrip(req)
-}
-
-func cloneTransport(base *http.Transport) *http.Transport {
-	if base == nil {
-		return defaultTransport()
-	}
-
-	cloned := *base
-	if base.TLSClientConfig != nil {
-		cloned.TLSClientConfig = base.TLSClientConfig.Clone()
-	}
-	if base.ProxyConnectHeader != nil {
-		cloned.ProxyConnectHeader = base.ProxyConnectHeader.Clone()
-	}
-	if base.TLSNextProto != nil {
-		nextProto := make(map[string]func(string, *tls.Conn) http.RoundTripper, len(base.TLSNextProto))
-		for k, v := range base.TLSNextProto {
-			nextProto[k] = v
-		}
-		cloned.TLSNextProto = nextProto
-	}
-	return &cloned
 }

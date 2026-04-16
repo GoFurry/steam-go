@@ -3,9 +3,11 @@ package steam_test
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -759,6 +761,72 @@ func TestRetryOnServerError(t *testing.T) {
 	}
 }
 
+func TestRetryOnServerErrorReusesSameAPIKey(t *testing.T) {
+	t.Parallel()
+
+	var attempts atomic.Int32
+	var seen []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.Query().Get("key"))
+		if attempts.Add(1) == 1 {
+			http.Error(w, "retry", http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(`{"response":{"players":[]}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithBaseURL(server.URL),
+		steam.WithAPIKeys("key-a", "key-b"),
+		steam.WithRetry(1),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	if err != nil {
+		t.Fatalf("GetPlayerSummaries returned error: %v", err)
+	}
+	if len(seen) != 2 || seen[0] != "key-a" || seen[1] != "key-a" {
+		t.Fatalf("unexpected key reuse on retry: %#v", seen)
+	}
+}
+
+func TestRetryOnServerErrorReusesSameAccessToken(t *testing.T) {
+	t.Parallel()
+
+	var attempts atomic.Int32
+	var seen []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.Query().Get("access_token"))
+		if attempts.Add(1) == 1 {
+			http.Error(w, "retry", http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(`{"response":{"players":[]}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithBaseURL(server.URL),
+		steam.WithAccessTokens("token-a", "token-b"),
+		steam.WithRetry(1),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	if err != nil {
+		t.Fatalf("GetPlayerSummaries returned error: %v", err)
+	}
+	if len(seen) != 2 || seen[0] != "token-a" || seen[1] != "token-a" {
+		t.Fatalf("unexpected access token reuse on retry: %#v", seen)
+	}
+}
+
 func TestRetryOnUnauthorizedWithKeyFailover(t *testing.T) {
 	t.Parallel()
 
@@ -956,6 +1024,50 @@ func TestProxySelectorErrorReturnsTransportError(t *testing.T) {
 	expectKind(t, err, steam.ErrorKindTransport)
 }
 
+func TestWithHTTPClientPreservesCustomRoundTripperWithoutProxy(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient(
+		steam.WithHTTPClient(&http.Client{
+			Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+				if r.URL.Path != "/ISteamUser/GetPlayerSummaries/v2/" {
+					t.Fatalf("unexpected path: %s", r.URL.Path)
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"response":{"players":[]}}`)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		}),
+		steam.WithBaseURL("https://api.steampowered.com"),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	if err != nil {
+		t.Fatalf("GetPlayerSummaries returned error: %v", err)
+	}
+}
+
+func TestWithHTTPClientAndProxySelectorRejectsUnsupportedRoundTripper(t *testing.T) {
+	t.Parallel()
+
+	_, err := steam.NewClient(
+		steam.WithHTTPClient(&http.Client{
+			Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+				return nil, errors.New("should not be called")
+			}),
+		}),
+		steam.WithProxySelector(errorProxySelector{}),
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 type stubProxySelector struct {
 	calls atomic.Int32
 }
@@ -969,6 +1081,12 @@ type errorProxySelector struct{}
 
 func (errorProxySelector) Next(*http.Request) (*url.URL, error) {
 	return nil, errors.New("proxy selector failed")
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 func newTestClient(t *testing.T, baseURL string) *steam.Client {

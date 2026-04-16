@@ -88,9 +88,14 @@ func NewHTTPClientWithProxySelector(selector ProxySelector, timeout time.Duratio
 		return nil, fmt.Errorf("timeout must not be negative")
 	}
 
+	rt, err := itransport.WrapRoundTripper(http.DefaultTransport, selector)
+	if err != nil {
+		return nil, err
+	}
+
 	return &http.Client{
 		Timeout:   timeout,
-		Transport: itransport.WrapRoundTripper(http.DefaultTransport, selector),
+		Transport: rt,
 	}, nil
 }
 
