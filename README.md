@@ -16,6 +16,7 @@
 
 - Root `Client` with grouped service access under `client.API.*`
 - Functional options for API key, access token, timeout, retry, rate limit, and proxy selection
+- Buffered response bodies are capped by default and can be tuned with `WithMaxResponseBodyBytes(...)`
 - `key` and `access_token` are treated as different credentials and can be configured independently
 - API key is optional and can be supplied through a rotating key provider
 - Typed responses by default with matching raw response methods

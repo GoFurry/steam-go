@@ -1068,6 +1068,15 @@ func TestWithHTTPClientAndProxySelectorRejectsUnsupportedRoundTripper(t *testing
 	}
 }
 
+func TestWithMaxResponseBodyBytesValidation(t *testing.T) {
+	t.Parallel()
+
+	_, err := steam.NewClient(steam.WithMaxResponseBodyBytes(0))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 type stubProxySelector struct {
 	calls atomic.Int32
 }

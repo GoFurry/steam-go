@@ -27,6 +27,7 @@ func TestExecutorSupportsRequestBody(t *testing.T) {
 		nil,
 		nil,
 		0,
+		1024,
 		recorder,
 	)
 	if err != nil {
@@ -83,6 +84,7 @@ func TestExecutorReusesRequestBodyAcrossRetries(t *testing.T) {
 		auth.NewStaticKeyProvider("demo-key"),
 		auth.NewStaticAccessTokenProvider("demo-token"),
 		1,
+		1024,
 		recorder,
 	)
 	if err != nil {
@@ -130,6 +132,7 @@ func TestExecutorPreservesExplicitContentTypeHeader(t *testing.T) {
 		nil,
 		nil,
 		0,
+		1024,
 		recorder,
 	)
 	if err != nil {
@@ -158,6 +161,7 @@ type recordingTransport struct {
 	mu       sync.Mutex
 	requests []capturedRequest
 	statuses []int
+	responseBody string
 }
 
 type capturedRequest struct {
@@ -169,11 +173,15 @@ type capturedRequest struct {
 }
 
 func (t *recordingTransport) Do(_ context.Context, req *http.Request) (*http.Response, error) {
-	body, err := io.ReadAll(req.Body)
-	if err != nil {
-		return nil, err
+	var body []byte
+	if req.Body != nil {
+		var err error
+		body, err = io.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
+		_ = req.Body.Close()
 	}
-	_ = req.Body.Close()
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -205,24 +213,68 @@ func (t *recordingTransport) Do(_ context.Context, req *http.Request) (*http.Res
 		status = t.statuses[0]
 		t.statuses = t.statuses[1:]
 	}
+	bodyValue := t.responseBody
+	if bodyValue == "" {
+		bodyValue = "ok"
+	}
 
 	return &http.Response{
 		StatusCode: status,
-		Body:       io.NopCloser(strings.NewReader("ok")),
+		Body:       io.NopCloser(strings.NewReader(bodyValue)),
 		Header:     make(http.Header),
 		Request:    req,
 	}, nil
 }
 
+func TestExecutorRejectsResponsesThatExceedBodyLimit(t *testing.T) {
+	t.Parallel()
+
+	recorder := &recordingTransport{
+		statuses:      []int{http.StatusOK},
+		responseBody:  strings.Repeat("a", 32),
+	}
+
+	executor, err := request.NewExecutor(
+		"https://api.steampowered.com",
+		nil,
+		nil,
+		0,
+		8,
+		recorder,
+	)
+	if err != nil {
+		t.Fatalf("NewExecutor returned error: %v", err)
+	}
+
+	_, err = executor.DoRaw(context.Background(), request.RequestSpec{
+		Method: http.MethodGet,
+		Path:   "/ITestService/DoThing/v1/",
+	})
+	var apiErr *sdkerrors.APIError
+	if err == nil || !errors.As(err, &apiErr) || apiErr.Kind != sdkerrors.KindTransport {
+		t.Fatalf("expected transport error for oversized body, got %v", err)
+	}
+}
+
 func TestExecutorReportsRequestBuildErrorForInvalidMethod(t *testing.T) {
 	t.Parallel()
 
-	executor, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, &recordingTransport{})
+	executor, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, 1024, &recordingTransport{})
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
 
 	_, err = executor.DoRaw(context.Background(), request.RequestSpec{})
+	var apiErr *sdkerrors.APIError
+	if err == nil || !errors.As(err, &apiErr) || apiErr.Kind != sdkerrors.KindRequestBuild {
+		t.Fatalf("expected request_build error, got %v", err)
+	}
+}
+
+func TestExecutorRejectsInvalidBodyLimit(t *testing.T) {
+	t.Parallel()
+
+	_, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, 0, &recordingTransport{})
 	var apiErr *sdkerrors.APIError
 	if err == nil || !errors.As(err, &apiErr) || apiErr.Kind != sdkerrors.KindRequestBuild {
 		t.Fatalf("expected request_build error, got %v", err)

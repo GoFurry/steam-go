@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/GoFurry/steam-go/internal/auth"
@@ -37,6 +39,7 @@ type Executor struct {
 	apiKeyProvider      auth.APIKeyProvider
 	accessTokenProvider auth.AccessTokenProvider
 	retry               int
+	maxResponseBodyBytes int64
 	transport           Transport
 }
 
@@ -46,16 +49,20 @@ type requestCredentials struct {
 }
 
 // NewExecutor creates a request executor.
-func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, transport Transport) (*Executor, error) {
+func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, maxResponseBodyBytes int64, transport Transport) (*Executor, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "invalid base url", nil, err)
+	}
+	if maxResponseBodyBytes <= 0 {
+		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "max response body bytes must be greater than zero", nil, nil)
 	}
 	return &Executor{
 		baseURL:             parsed,
 		apiKeyProvider:      apiKeyProvider,
 		accessTokenProvider: accessTokenProvider,
 		retry:               retry,
+		maxResponseBodyBytes: maxResponseBodyBytes,
 		transport:           transport,
 	}, nil
 }
@@ -88,7 +95,7 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 		if err != nil {
 			lastErr = sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, err)
 			if shouldRetryTransport(ctx, err) && attempt < e.retry {
-				if !sleepBeforeRetry(ctx, attempt) {
+				if !sleepBeforeRetry(ctx, attempt, nil) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -96,11 +103,11 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 			return nil, lastErr
 		}
 
-		body, readErr := readAndCloseBody(resp)
+		body, readErr := readAndCloseBody(resp, e.maxResponseBodyBytes)
 		if readErr != nil {
 			lastErr = sdkerrors.New(sdkerrors.KindTransport, resp.StatusCode, "read response body failed", nil, readErr)
 			if attempt < e.retry {
-				if !sleepBeforeRetry(ctx, attempt) {
+				if !sleepBeforeRetry(ctx, attempt, resp) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -123,7 +130,7 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 						return nil, err
 					}
 				}
-				if !sleepBeforeRetry(ctx, attempt) {
+				if !sleepBeforeRetry(ctx, attempt, resp) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -212,9 +219,21 @@ func (e *Executor) buildRequest(ctx context.Context, resolved *url.URL, spec Req
 	return req, nil
 }
 
-func readAndCloseBody(resp *http.Response) ([]byte, error) {
+func readAndCloseBody(resp *http.Response, maxBytes int64) ([]byte, error) {
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	if maxBytes <= 0 {
+		return io.ReadAll(resp.Body)
+	}
+
+	reader := &io.LimitedReader{R: resp.Body, N: maxBytes + 1}
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, fmt.Errorf("response body exceeds limit of %d bytes", maxBytes)
+	}
+	return body, nil
 }
 
 func shouldRetryTransport(ctx context.Context, err error) bool {
@@ -241,12 +260,47 @@ func shouldRotateAPIKey(statusCode int, hasAPIKeyProvider bool) bool {
 	return statusCode == http.StatusUnauthorized || statusCode == http.StatusTooManyRequests
 }
 
-func sleepBeforeRetry(ctx context.Context, attempt int) bool {
-	delay := time.Duration(attempt+1) * 100 * time.Millisecond
+func sleepBeforeRetry(ctx context.Context, attempt int, resp *http.Response) bool {
+	delay := retryDelay(attempt, resp, time.Now())
 	select {
 	case <-ctx.Done():
 		return false
 	case <-time.After(delay):
 		return true
 	}
+}
+
+func retryDelay(attempt int, resp *http.Response, now time.Time) time.Duration {
+	if delay, ok := retryAfterDelay(resp, now); ok {
+		return delay
+	}
+	return time.Duration(attempt+1) * 100 * time.Millisecond
+}
+
+func retryAfterDelay(resp *http.Response, now time.Time) (time.Duration, bool) {
+	if resp == nil {
+		return 0, false
+	}
+
+	raw := strings.TrimSpace(resp.Header.Get("Retry-After"))
+	if raw == "" {
+		return 0, false
+	}
+
+	seconds, err := strconv.Atoi(raw)
+	if err == nil {
+		if seconds < 0 {
+			return 0, true
+		}
+		return time.Duration(seconds) * time.Second, true
+	}
+
+	when, err := http.ParseTime(raw)
+	if err != nil {
+		return 0, false
+	}
+	if when.Before(now) {
+		return 0, true
+	}
+	return when.Sub(now), true
 }

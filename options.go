@@ -34,15 +34,17 @@ type clientConfig struct {
 	timeout             time.Duration
 	retry               int
 	rateLimit           int
+	maxResponseBodyBytes int64
 	proxySelector       ProxySelector
 }
 
 func defaultClientConfig() clientConfig {
 	return clientConfig{
-		baseURL:   defaultBaseURL,
-		timeout:   10 * time.Second,
-		retry:     0,
-		rateLimit: 0,
+		baseURL:              defaultBaseURL,
+		timeout:              10 * time.Second,
+		retry:                0,
+		rateLimit:            0,
+		maxResponseBodyBytes: 16 << 20,
 	}
 }
 
@@ -163,6 +165,17 @@ func WithRateLimit(requestsPerSecond int) Option {
 			return fmt.Errorf("rate limit must not be negative")
 		}
 		cfg.rateLimit = requestsPerSecond
+		return nil
+	}
+}
+
+// WithMaxResponseBodyBytes limits how many bytes the SDK will buffer for one response body.
+func WithMaxResponseBodyBytes(max int64) Option {
+	return func(cfg *clientConfig) error {
+		if max <= 0 {
+			return fmt.Errorf("max response body bytes must be greater than zero")
+		}
+		cfg.maxResponseBodyBytes = max
 		return nil
 	}
 }

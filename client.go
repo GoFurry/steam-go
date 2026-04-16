@@ -50,7 +50,14 @@ func NewClient(opts ...Option) (*Client, error) {
 		return nil, err
 	}
 	rt := transport.New(httpClient, cfg.rateLimit)
-	executor, err := request.NewExecutor(cfg.baseURL, cfg.apiKeyProvider, cfg.accessTokenProvider, cfg.retry, rt)
+	executor, err := request.NewExecutor(
+		cfg.baseURL,
+		cfg.apiKeyProvider,
+		cfg.accessTokenProvider,
+		cfg.retry,
+		cfg.maxResponseBodyBytes,
+		rt,
+	)
 	if err != nil {
 		return nil, err
 	}
