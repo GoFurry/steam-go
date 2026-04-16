@@ -146,6 +146,31 @@ func TestVerifyValuesSuccess(t *testing.T) {
 	}
 }
 
+func TestVerifyValuesAcceptsHTTPClaimedID(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("is_valid:true\n"))
+	}))
+	defer server.Close()
+
+	verifier := newVerifierWithEndpoint(t, server.URL)
+	values := sampleValues("")
+	values.Set("openid.claimed_id", "http://steamcommunity.com/openid/id/76561198000000000")
+	values.Set("openid.identity", "http://steamcommunity.com/openid/id/76561198000000000")
+
+	identity, err := verifier.VerifyValues(context.Background(), values)
+	if err != nil {
+		t.Fatalf("VerifyValues returned error: %v", err)
+	}
+	if identity.SteamID != "76561198000000000" {
+		t.Fatalf("unexpected steam id: %s", identity.SteamID)
+	}
+	if identity.ClaimedID != "http://steamcommunity.com/openid/id/76561198000000000" {
+		t.Fatalf("unexpected claimed_id: %s", identity.ClaimedID)
+	}
+}
+
 func TestVerifyRequestDelegatesToValues(t *testing.T) {
 	t.Parallel()
 

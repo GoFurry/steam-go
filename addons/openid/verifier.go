@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	openIDNamespace         = "http://specs.openid.net/auth/2.0"
-	identifierSelect        = "http://specs.openid.net/auth/2.0/identifier_select"
-	expectedClaimedIDPrefix = "https://steamcommunity.com/openid/id/"
+	openIDNamespace  = "http://specs.openid.net/auth/2.0"
+	identifierSelect = "http://specs.openid.net/auth/2.0/identifier_select"
+	claimedIDHost    = "steamcommunity.com"
+	claimedIDPrefix  = "/openid/id/"
 )
 
 type Config struct {
@@ -272,7 +273,8 @@ func parseAbsoluteURL(raw string) (*url.URL, error) {
 }
 
 func parseSteamID(claimedID string) (string, error) {
-	if !strings.HasPrefix(claimedID, expectedClaimedIDPrefix) {
+	parsed, err := url.Parse(claimedID)
+	if err != nil {
 		return "", &Error{
 			Code:    ErrorCodeIdentity,
 			Op:      "verify_values",
@@ -280,7 +282,23 @@ func parseSteamID(claimedID string) (string, error) {
 		}
 	}
 
-	steamID := strings.TrimPrefix(claimedID, expectedClaimedIDPrefix)
+	if (parsed.Scheme != "https" && parsed.Scheme != "http") || !strings.EqualFold(parsed.Host, claimedIDHost) {
+		return "", &Error{
+			Code:    ErrorCodeIdentity,
+			Op:      "verify_values",
+			Message: "invalid claimed_id",
+		}
+	}
+
+	if !strings.HasPrefix(parsed.Path, claimedIDPrefix) {
+		return "", &Error{
+			Code:    ErrorCodeIdentity,
+			Op:      "verify_values",
+			Message: "invalid claimed_id",
+		}
+	}
+
+	steamID := strings.TrimPrefix(parsed.Path, claimedIDPrefix)
 	if steamID == "" || strings.Contains(steamID, "/") {
 		return "", &Error{
 			Code:    ErrorCodeIdentity,

@@ -1,6 +1,7 @@
 package request
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -22,10 +23,12 @@ type Transport interface {
 
 // RequestSpec describes a Steam API request.
 type RequestSpec struct {
-	Method  string
-	Path    string
-	Query   url.Values
-	Headers http.Header
+	Method      string
+	Path        string
+	Query       url.Values
+	Headers     http.Header
+	Body        []byte
+	ContentType string
 }
 
 // Executor performs request assembly and response reading.
@@ -183,7 +186,12 @@ func (e *Executor) resolveAccessToken(req *http.Request) (string, error) {
 }
 
 func (e *Executor) buildRequest(ctx context.Context, resolved *url.URL, spec RequestSpec, creds requestCredentials) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, spec.Method, resolved.String(), nil)
+	var body io.Reader
+	if len(spec.Body) > 0 {
+		body = bytes.NewReader(spec.Body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, spec.Method, resolved.String(), body)
 	if err != nil {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "build request failed", nil, err)
 	}
@@ -196,6 +204,9 @@ func (e *Executor) buildRequest(ctx context.Context, resolved *url.URL, spec Req
 		for _, value := range values {
 			req.Header.Add(key, value)
 		}
+	}
+	if spec.ContentType != "" && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", spec.ContentType)
 	}
 
 	return req, nil

@@ -73,6 +73,9 @@ func baseTransport(rt http.RoundTripper) (*http.Transport, error) {
 }
 
 func defaultTransport() *http.Transport {
+	if base, ok := http.DefaultTransport.(*http.Transport); ok {
+		return base.Clone()
+	}
 	return &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		MaxIdleConns:          100,
