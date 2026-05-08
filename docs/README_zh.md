@@ -122,7 +122,8 @@ if err != nil {
 - `go run ./examples/openid`
 - `go run ./examples/openid --proxy http://127.0.0.1:7897`
 - `go run ./examples/proxy`
-- `go run ./test`
+- `go run ./test/steamuser`
+- `go run ./test/playerservice`
 
 ## 错误处理
 
