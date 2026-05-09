@@ -23,6 +23,7 @@ Run a specific API-group smoke test with:
 - `go run ./test/storecatalogservice`
 - `go run ./test/storepreferencesservice`
 - `go run ./test/storeservice`
+- `go run ./test/storetopsellersservice`
 - `go run ./test/steamdirectory`
 - `go run ./test/steamapps`
 - `go run ./test/steamchartsservice`
@@ -32,3 +33,6 @@ Run a specific API-group smoke test with:
 - `go run ./test/steamuseroauth`
 - `go run ./test/steamuserstats`
 - `go run ./test/steamwebapiutil`
+- `go run ./test/useraccountservice`
+- `go run ./test/userreviewsservice`
+- `go run ./test/userstorevisitservice`

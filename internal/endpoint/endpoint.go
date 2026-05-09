@@ -51,6 +51,8 @@ const (
 	StoreServiceGetGamesFollowedCount                         = "/IStoreService/GetGamesFollowedCount/v1/"
 	StoreServiceGetMostPopularTags                            = "/IStoreService/GetMostPopularTags/v1/"
 	StoreServiceGetUserGameInterestState                      = "/IStoreService/GetUserGameInterestState/v1/"
+	StoreTopSellersServiceGetCountryList                      = "/IStoreTopSellersService/GetCountryList/v1/"
+	StoreTopSellersServiceGetWeeklyTopSellers                 = "/IStoreTopSellersService/GetWeeklyTopSellers/v1/"
 	SteamDirectoryGetCMListForConnect                         = "/ISteamDirectory/GetCMListForConnect/v1/"
 	SteamDirectoryGetSteamPipeDomains                         = "/ISteamDirectory/GetSteamPipeDomains/v1/"
 	SteamAppsGetSDRConfig                                     = "/ISteamApps/GetSDRConfig/v1/"
@@ -79,4 +81,8 @@ const (
 	SteamUserStatsGetUserStatsForGame                         = "/ISteamUserStats/GetUserStatsForGame/v2/"
 	SteamWebAPIUtilGetServerInfo                              = "/ISteamWebAPIUtil/GetServerInfo/v1/"
 	SteamWebAPIUtilGetSupportedAPIList                        = "/ISteamWebAPIUtil/GetSupportedAPIList/v1/"
+	UserAccountServiceGetUserCountry                          = "/IUserAccountService/GetUserCountry/v1/"
+	UserReviewsServiceGetFriendsRecommendedApp                = "/IUserReviewsService/GetFriendsRecommendedApp/v1/"
+	UserStoreVisitServiceGetFrequentlyVisitedPages            = "/IUserStoreVisitService/GetFrequentlyVisitedPages/v1/"
+	UserStoreVisitServiceGetMostVisitedItemsOnStore           = "/IUserStoreVisitService/GetMostVisitedItemsOnStore/v1/"
 )

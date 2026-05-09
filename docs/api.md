@@ -18,6 +18,7 @@ This directory keeps reference-style documentation that is too detailed for the 
 - `client.API.StoreCatalogService`
 - `client.API.StorePreferencesService`
 - `client.API.StoreService`
+- `client.API.StoreTopSellersService`
 - `client.API.SteamDirectory`
 - `client.API.SteamApps`
 - `client.API.SteamChartsService`
@@ -27,6 +28,9 @@ This directory keeps reference-style documentation that is too detailed for the 
 - `client.API.SteamUserOAuth`
 - `client.API.SteamUserStats`
 - `client.API.SteamWebAPIUtil`
+- `client.API.UserAccountService`
+- `client.API.UserReviewsService`
+- `client.API.UserStoreVisitService`
 
 ## Selected Endpoint Coverage
 
@@ -98,6 +102,11 @@ These are not exhaustive lists, but they reflect the main typed SDK coverage ava
 - `GetMostPopularTags`
 - `GetUserGameInterestState`
 
+### `client.API.StoreTopSellersService`
+
+- `GetCountryList`
+- `GetWeeklyTopSellers`
+
 ### `client.API.SteamDirectory`
 
 - `GetCMListForConnect`
@@ -151,6 +160,19 @@ These are not exhaustive lists, but they reflect the main typed SDK coverage ava
 
 - `GetServerInfo`
 - `GetSupportedAPIList`
+
+### `client.API.UserAccountService`
+
+- `GetUserCountry`
+
+### `client.API.UserReviewsService`
+
+- `GetFriendsRecommendedApp`
+
+### `client.API.UserStoreVisitService`
+
+- `GetFrequentlyVisitedPages`
+- `GetMostVisitedItemsOnStore`
 
 ## Credential Notes
 

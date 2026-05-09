@@ -2,6 +2,7 @@ package steam_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 	"github.com/GoFurry/steam-go/api/steamuser"
 	"github.com/GoFurry/steam-go/api/steamuserstats"
 	"github.com/GoFurry/steam-go/api/storeservice"
+	"github.com/GoFurry/steam-go/api/userstorevisitservice"
 )
 
 func TestNewClientRequiresAPIKey(t *testing.T) {
@@ -60,6 +62,9 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	if client.API.StorePreferencesService == nil || client.API.StoreService == nil {
 		t.Fatal("expected store preference and store services to be initialized")
 	}
+	if client.API.StoreTopSellersService == nil {
+		t.Fatal("expected store top sellers service to be initialized")
+	}
 	if client.API.SteamApps == nil {
 		t.Fatal("expected steam apps service to be initialized")
 	}
@@ -77,6 +82,9 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	}
 	if client.API.SteamUserOAuth == nil || client.API.SteamWebAPIUtil == nil {
 		t.Fatal("expected steam oauth and web api util services to be initialized")
+	}
+	if client.API.UserAccountService == nil || client.API.UserReviewsService == nil || client.API.UserStoreVisitService == nil {
+		t.Fatal("expected user account, review, and store visit services to be initialized")
 	}
 }
 
@@ -2322,6 +2330,277 @@ func TestStorePreferencesServiceUsesExplicitAccessToken(t *testing.T) {
 	if len(resp.Response.IgnoreList) != 2 || resp.Response.IgnoreList[0].AppID != 1005490 {
 		t.Fatalf("unexpected ignore list: %#v", resp.Response.IgnoreList)
 	}
+}
+
+func TestStoreTopSellersService(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/IStoreTopSellersService/GetCountryList/v1/":
+			if got := r.URL.Query().Get("key"); got != "test-key" {
+				t.Fatalf("unexpected api key: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"countries":[{"country_code":"CN","name":"China"},{"country_code":"US","name":"United States"}]}}`))
+		case "/IStoreTopSellersService/GetWeeklyTopSellers/v1/":
+			if got := r.URL.Query().Get("key"); got != "test-key" {
+				t.Fatalf("unexpected api key: %s", got)
+			}
+			var payload struct {
+				Context struct {
+					CountryCode string `json:"country_code"`
+				} `json:"context"`
+			}
+			if err := json.Unmarshal([]byte(r.URL.Query().Get("input_json")), &payload); err != nil {
+				t.Fatalf("unmarshal input_json failed: %v", err)
+			}
+			if payload.Context.CountryCode != "CN" {
+				t.Fatalf("unexpected country code: %s", payload.Context.CountryCode)
+			}
+			_, _ = w.Write([]byte(`{"response":{"country_code":"CN","top_sellers":[{"appid":550}]}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	countryList, err := client.API.StoreTopSellersService.GetCountryList(context.Background())
+	if err != nil {
+		t.Fatalf("GetCountryList returned error: %v", err)
+	}
+	if len(countryList.Response.Countries) != 2 || countryList.Response.Countries[0].CountryCode != "CN" {
+		t.Fatalf("unexpected countries: %#v", countryList.Response.Countries)
+	}
+
+	weekly, err := client.API.StoreTopSellersService.GetWeeklyTopSellers(context.Background(), "CN")
+	if err != nil {
+		t.Fatalf("GetWeeklyTopSellers returned error: %v", err)
+	}
+	if !strings.Contains(string(weekly.Response), `"top_sellers"`) {
+		t.Fatalf("unexpected weekly response: %s", string(weekly.Response))
+	}
+}
+
+func TestStoreTopSellersServiceValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient(steam.WithAPIKey("test-key"))
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.API.StoreTopSellersService.GetWeeklyTopSellers(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+}
+
+func TestUserAccountServiceUsesExplicitAccessToken(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/IUserAccountService/GetUserCountry/v1/" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("access_token"); got != "user-token" {
+			t.Fatalf("unexpected access token: %s", got)
+		}
+		if got := query.Get("steamid"); got != "76561198370695025" {
+			t.Fatalf("unexpected steamid: %s", got)
+		}
+		if got := query.Get("key"); got != "test-key" {
+			t.Fatalf("unexpected api key: %s", got)
+		}
+		_, _ = w.Write([]byte(`{"response":{"country":"HK"}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithAccessToken("global-token"),
+		steam.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	resp, err := client.API.UserAccountService.GetUserCountry(context.Background(), "user-token", "76561198370695025")
+	if err != nil {
+		t.Fatalf("GetUserCountry returned error: %v", err)
+	}
+	if resp.Response.Country != "HK" {
+		t.Fatalf("unexpected country: %#v", resp.Response)
+	}
+}
+
+func TestUserReviewsServiceUsesExplicitAccessToken(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/IUserReviewsService/GetFriendsRecommendedApp/v1/" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if got := query.Get("access_token"); got != "user-token" {
+			t.Fatalf("unexpected access token: %s", got)
+		}
+		if got := query.Get("appid"); got != "550" {
+			t.Fatalf("unexpected appid: %s", got)
+		}
+		if got := query.Get("key"); got != "test-key" {
+			t.Fatalf("unexpected api key: %s", got)
+		}
+		_, _ = w.Write([]byte(`{"response":{"accountids_recommended":[907748460,1728978895]}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithAccessToken("global-token"),
+		steam.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	resp, err := client.API.UserReviewsService.GetFriendsRecommendedApp(context.Background(), "user-token", 550)
+	if err != nil {
+		t.Fatalf("GetFriendsRecommendedApp returned error: %v", err)
+	}
+	if len(resp.Response.AccountIDsRecommended) != 2 || resp.Response.AccountIDsRecommended[0] != 907748460 {
+		t.Fatalf("unexpected recommended accounts: %#v", resp.Response.AccountIDsRecommended)
+	}
+}
+
+func TestUserStoreVisitService(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/IUserStoreVisitService/GetFrequentlyVisitedPages/v1/":
+			query := r.URL.Query()
+			if got := query.Get("access_token"); got != "user-token" {
+				t.Fatalf("unexpected access token: %s", got)
+			}
+			if got := query.Get("key"); got != "test-key" {
+				t.Fatalf("unexpected api key: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"visit_data":{"recent_apps":[{"item_id":{"appid":2483190},"time_visit":1778310751}]},"frequent_hubs":[{"item_id":{"tagid":11014},"time_visit":1777123729,"visit_count":1},{"item_id":{"hubcategoryid":151},"time_visit":1777123302,"visit_count":1}]}}`))
+		case "/IUserStoreVisitService/GetMostVisitedItemsOnStore/v1/":
+			if got := r.URL.Query().Get("key"); got != "test-key" {
+				t.Fatalf("unexpected api key: %s", got)
+			}
+			var payload struct {
+				Context struct {
+					CountryCode string `json:"country_code"`
+				} `json:"context"`
+				DataRequest map[string]any `json:"data_request"`
+			}
+			if err := json.Unmarshal([]byte(r.URL.Query().Get("input_json")), &payload); err != nil {
+				t.Fatalf("unmarshal input_json failed: %v", err)
+			}
+			if payload.Context.CountryCode != "CN" {
+				t.Fatalf("unexpected country code: %s", payload.Context.CountryCode)
+			}
+			if got, ok := payload.DataRequest["include_assets"].(bool); !ok || !got {
+				t.Fatalf("unexpected include_assets: %#v", payload.DataRequest["include_assets"])
+			}
+			if got, ok := payload.DataRequest["include_tag_count"].(string); !ok || got != "5" {
+				t.Fatalf("unexpected include_tag_count: %#v", payload.DataRequest["include_tag_count"])
+			}
+			_, _ = w.Write([]byte(`{"response":{"item_ids":[{"appid":3526710}],"items":[{"appid":3526710,"name":"Everything is Crab"}]}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithAccessToken("global-token"),
+		steam.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	visits, err := client.API.UserStoreVisitService.GetFrequentlyVisitedPages(context.Background(), "user-token")
+	if err != nil {
+		t.Fatalf("GetFrequentlyVisitedPages returned error: %v", err)
+	}
+	if len(visits.Response.VisitData.RecentApps) != 1 || visits.Response.VisitData.RecentApps[0].ItemID.AppID != 2483190 {
+		t.Fatalf("unexpected recent apps: %#v", visits.Response.VisitData.RecentApps)
+	}
+	if len(visits.Response.FrequentHubs) != 2 || visits.Response.FrequentHubs[1].ItemID.HubCategoryID != 151 {
+		t.Fatalf("unexpected frequent hubs: %#v", visits.Response.FrequentHubs)
+	}
+
+	trueValue := true
+	mostVisited, err := client.API.UserStoreVisitService.GetMostVisitedItemsOnStore(
+		context.Background(),
+		"CN",
+		&userstorevisitservice.GetMostVisitedItemsOnStoreOptions{
+			IncludeAssets:                 &trueValue,
+			IncludeRelease:                &trueValue,
+			IncludePlatforms:              &trueValue,
+			IncludeAllPurchaseOptions:     &trueValue,
+			IncludeScreenshots:            &trueValue,
+			IncludeTrailers:               &trueValue,
+			IncludeRatings:                &trueValue,
+			IncludeTagCount:               "5",
+			IncludeReviews:                &trueValue,
+			IncludeBasicInfo:              &trueValue,
+			IncludeSupportedLanguages:     &trueValue,
+			IncludeFullDescription:        &trueValue,
+			IncludeIncludedItems:          &trueValue,
+			IncludeAssetsWithoutOverrides: &trueValue,
+			ApplyUserFilters:              &trueValue,
+			IncludeLinks:                  &trueValue,
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetMostVisitedItemsOnStore returned error: %v", err)
+	}
+	if len(mostVisited.Response.ItemIDs) != 1 || mostVisited.Response.ItemIDs[0].AppID != 3526710 {
+		t.Fatalf("unexpected item ids: %#v", mostVisited.Response.ItemIDs)
+	}
+	if len(mostVisited.Response.Items) != 1 {
+		t.Fatalf("unexpected items: %d", len(mostVisited.Response.Items))
+	}
+}
+
+func TestUserScopedServicesValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient(steam.WithAPIKey("test-key"))
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.API.UserAccountService.GetUserCountry(context.Background(), "", "76561198370695025")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.UserAccountService.GetUserCountry(context.Background(), "user-token", "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.UserReviewsService.GetFriendsRecommendedApp(context.Background(), "", 550)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.UserReviewsService.GetFriendsRecommendedApp(context.Background(), "user-token", 0)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.UserStoreVisitService.GetFrequentlyVisitedPages(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.UserStoreVisitService.GetMostVisitedItemsOnStore(context.Background(), "", nil)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
 func TestStoreServiceEndpoints(t *testing.T) {

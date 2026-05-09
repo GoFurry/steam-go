@@ -26,6 +26,10 @@ import (
 	"github.com/GoFurry/steam-go/api/storecatalogservice"
 	"github.com/GoFurry/steam-go/api/storepreferencesservice"
 	"github.com/GoFurry/steam-go/api/storeservice"
+	"github.com/GoFurry/steam-go/api/storetopsellersservice"
+	"github.com/GoFurry/steam-go/api/useraccountservice"
+	"github.com/GoFurry/steam-go/api/userreviewsservice"
+	"github.com/GoFurry/steam-go/api/userstorevisitservice"
 	"github.com/GoFurry/steam-go/internal/request"
 	"github.com/GoFurry/steam-go/internal/transport"
 )
@@ -52,6 +56,7 @@ type API struct {
 	StoreCatalogService       *storecatalogservice.Service
 	StorePreferencesService   *storepreferencesservice.Service
 	StoreService              *storeservice.Service
+	StoreTopSellersService    *storetopsellersservice.Service
 	SteamDirectory            *steamdirectory.Service
 	SteamApps                 *steamapps.Service
 	SteamChartsService        *steamchartsservice.Service
@@ -59,6 +64,9 @@ type API struct {
 	SteamUser                 *steamuser.Service
 	SteamUserOAuth            *steamuseroauth.Service
 	SteamWebAPIUtil           *steamwebapiutil.Service
+	UserAccountService        *useraccountservice.Service
+	UserReviewsService        *userreviewsservice.Service
+	UserStoreVisitService     *userstorevisitservice.Service
 	PlayerService             *playerservice.Service
 	SteamNews                 *steamnews.Service
 	SteamUserStats            *steamuserstats.Service
@@ -107,6 +115,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		StoreCatalogService:       storecatalogservice.NewService(executor),
 		StorePreferencesService:   storepreferencesservice.NewService(executor),
 		StoreService:              storeservice.NewService(executor),
+		StoreTopSellersService:    storetopsellersservice.NewService(executor),
 		SteamDirectory:            steamdirectory.NewService(executor),
 		SteamApps:                 steamapps.NewService(executor),
 		SteamChartsService:        steamchartsservice.NewService(executor),
@@ -114,6 +123,9 @@ func NewClient(opts ...Option) (*Client, error) {
 		SteamUser:                 steamuser.NewService(executor),
 		SteamUserOAuth:            steamuseroauth.NewService(executor),
 		SteamWebAPIUtil:           steamwebapiutil.NewService(executor),
+		UserAccountService:        useraccountservice.NewService(executor),
+		UserReviewsService:        userreviewsservice.NewService(executor),
+		UserStoreVisitService:     userstorevisitservice.NewService(executor),
 		PlayerService:             playerservice.NewService(executor),
 		SteamNews:                 steamnews.NewService(executor),
 		SteamUserStats:            steamuserstats.NewService(executor),
