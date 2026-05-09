@@ -181,6 +181,11 @@ These are not exhaustive lists, but they reflect the main typed SDK coverage ava
 - `GetWishlistItemCount`
 - `GetWishlistItemsOnSale`
 
+Notes:
+- `GetWishlist` and `GetWishlistItemCount` accept `steamid`.
+- `GetWishlistItemsOnSale` accepts `accessToken`, `countryCode`, and optional `data_request` fields through `input_json`.
+- The `store_item` field in `GetWishlistItemsOnSale` is intentionally exposed as `json.RawMessage` because the payload is large and Steam changes it frequently.
+
 ## Credential Notes
 
 - `key` and `access_token` are treated as different credentials.
