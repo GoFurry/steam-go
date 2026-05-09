@@ -20,7 +20,9 @@ This directory keeps reference-style documentation that is too detailed for the 
 - `client.API.SteamNews`
 - `client.API.SteamNotificationService`
 - `client.API.SteamUser`
+- `client.API.SteamUserOAuth`
 - `client.API.SteamUserStats`
+- `client.API.SteamWebAPIUtil`
 
 ## Selected Endpoint Coverage
 
@@ -107,6 +109,24 @@ These are not exhaustive lists, but they reflect the main typed SDK coverage ava
 - `GetPlayerBans`
 - `GetPlayerSummaries`
 - `GetUserGroupList`
+
+### `client.API.SteamUserOAuth`
+
+- `GetFriendList`
+- `GetUserSummaries`
+
+### `client.API.SteamUserStats`
+
+- `GetGlobalAchievementPercentagesForApp`
+- `GetNumberOfCurrentPlayers`
+- `GetPlayerAchievements`
+- `GetSchemaForGame`
+- `GetUserStatsForGame`
+
+### `client.API.SteamWebAPIUtil`
+
+- `GetServerInfo`
+- `GetSupportedAPIList`
 
 ## Credential Notes
 

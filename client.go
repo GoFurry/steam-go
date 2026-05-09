@@ -19,7 +19,9 @@ import (
 	"github.com/GoFurry/steam-go/api/steamnews"
 	"github.com/GoFurry/steam-go/api/steamnotificationservice"
 	"github.com/GoFurry/steam-go/api/steamuser"
+	"github.com/GoFurry/steam-go/api/steamuseroauth"
 	"github.com/GoFurry/steam-go/api/steamuserstats"
+	"github.com/GoFurry/steam-go/api/steamwebapiutil"
 	"github.com/GoFurry/steam-go/internal/request"
 	"github.com/GoFurry/steam-go/internal/transport"
 )
@@ -47,6 +49,8 @@ type API struct {
 	SteamChartsService        *steamchartsservice.Service
 	SteamNotificationService  *steamnotificationservice.Service
 	SteamUser                 *steamuser.Service
+	SteamUserOAuth            *steamuseroauth.Service
+	SteamWebAPIUtil           *steamwebapiutil.Service
 	PlayerService             *playerservice.Service
 	SteamNews                 *steamnews.Service
 	SteamUserStats            *steamuserstats.Service
@@ -96,6 +100,8 @@ func NewClient(opts ...Option) (*Client, error) {
 		SteamChartsService:        steamchartsservice.NewService(executor),
 		SteamNotificationService:  steamnotificationservice.NewService(executor),
 		SteamUser:                 steamuser.NewService(executor),
+		SteamUserOAuth:            steamuseroauth.NewService(executor),
+		SteamWebAPIUtil:           steamwebapiutil.NewService(executor),
 		PlayerService:             playerservice.NewService(executor),
 		SteamNews:                 steamnews.NewService(executor),
 		SteamUserStats:            steamuserstats.NewService(executor),

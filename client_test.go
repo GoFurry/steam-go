@@ -65,6 +65,12 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	if client.API.SteamNotificationService == nil {
 		t.Fatal("expected steam notification service to be initialized")
 	}
+	if client.API.SteamUser == nil || client.API.SteamUserStats == nil {
+		t.Fatal("expected steam user services to be initialized")
+	}
+	if client.API.SteamUserOAuth == nil || client.API.SteamWebAPIUtil == nil {
+		t.Fatal("expected steam oauth and web api util services to be initialized")
+	}
 }
 
 func TestAccountCartServiceGetCart(t *testing.T) {
@@ -1098,6 +1104,76 @@ func TestSteamUserGetPlayerSummariesRaw(t *testing.T) {
 	}
 }
 
+func TestSteamUserOAuthUsesExplicitAccessToken(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		switch r.URL.Path {
+		case "/ISteamUserOAuth/GetUserSummaries/v1/":
+			if got := query.Get("steamids"); got != "76561198856448829,76561198370695025" {
+				t.Fatalf("unexpected steamids: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"players":[{"steamid":"76561198370695025","personaname":"百兽发布"},{"steamid":"76561198856448829","personaname":"-"}]}`))
+		case "/ISteamUserOAuth/GetFriendList/v1/":
+			if got := query.Get("access_token"); got != "user-token" {
+				t.Fatalf("unexpected access token: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"friends":[{"steamid":"76561198095859886","relationship":"friend","friend_since":1615463685},{"steamid":"76561198856448829","relationship":"friend","friend_since":1664934883}]}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithAccessToken("global-token"),
+		steam.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	summaries, err := client.API.SteamUserOAuth.GetUserSummaries(context.Background(), []string{"76561198856448829", "76561198370695025"})
+	if err != nil {
+		t.Fatalf("GetUserSummaries returned error: %v", err)
+	}
+	if len(summaries.Players) != 2 || summaries.Players[0].PersonaName != "百兽发布" {
+		t.Fatalf("unexpected summaries: %#v", summaries.Players)
+	}
+
+	friends, err := client.API.SteamUserOAuth.GetFriendList(context.Background(), "user-token")
+	if err != nil {
+		t.Fatalf("GetFriendList returned error: %v", err)
+	}
+	if len(friends.Friends) != 2 || friends.Friends[0].FriendSince != 1615463685 {
+		t.Fatalf("unexpected friend list: %#v", friends.Friends)
+	}
+}
+
+func TestSteamUserOAuthValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient(steam.WithAPIKey("test-key"))
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.API.SteamUserOAuth.GetUserSummaries(context.Background(), nil)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	tooMany := make([]string, 101)
+	for i := range tooMany {
+		tooMany[i] = "1"
+	}
+	_, err = client.API.SteamUserOAuth.GetUserSummaries(context.Background(), tooMany)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamUserOAuth.GetFriendList(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+}
+
 func TestSteamUserValidation(t *testing.T) {
 	t.Parallel()
 
@@ -2010,6 +2086,76 @@ func TestSteamUserStatsGetPlayerAchievementsRaw(t *testing.T) {
 	}
 }
 
+func TestSteamUserStatsAdditionalEndpoints(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		switch r.URL.Path {
+		case "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/":
+			if got := query.Get("gameid"); got != "550" {
+				t.Fatalf("unexpected gameid: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"achievementpercentages":{"achievements":[{"name":"GLOBAL_GNOME_ALONE","percent":"68.6"}]}}`))
+		case "/ISteamUserStats/GetSchemaForGame/v2/":
+			if got := query.Get("appid"); got != "550" {
+				t.Fatalf("unexpected appid: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"game":{"gameName":"Left 4 Dead 2","gameVersion":"143","availableGameStats":{"achievements":[{"name":"ACH_HONK_A_CLOWNS_NOSE","defaultvalue":0,"displayName":"CL0WND","hidden":0,"description":"Honk the noses of 10 Clowns.","icon":"icon","icongray":"gray"}],"stats":[{"name":"Stat.GamesPlayed.Total","defaultvalue":0,"displayName":"txt.Stat.GamesPlayed.Total"}]}}}`))
+		case "/ISteamUserStats/GetNumberOfCurrentPlayers/v1/":
+			if got := query.Get("appid"); got != "550" {
+				t.Fatalf("unexpected appid: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"player_count":21495,"result":1}}`))
+		case "/ISteamUserStats/GetUserStatsForGame/v2/":
+			if got := query.Get("steamid"); got != "76561198370695025" {
+				t.Fatalf("unexpected steamid: %s", got)
+			}
+			if got := query.Get("appid"); got != "550" {
+				t.Fatalf("unexpected appid: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"playerstats":{"steamID":"76561198370695025","gameName":"Left 4 Dead 2","achievements":[{"name":"ACH_HONK_A_CLOWNS_NOSE","achieved":1}],"stats":[{"name":"Stat.GamesPlayed.Total","value":2552},{"name":"Stat.KitsUsed.Avg","value":0.8538401126861572}]}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	global, err := client.API.SteamUserStats.GetGlobalAchievementPercentagesForApp(context.Background(), 550)
+	if err != nil {
+		t.Fatalf("GetGlobalAchievementPercentagesForApp returned error: %v", err)
+	}
+	if len(global.AchievementPercentages.Achievements) != 1 || global.AchievementPercentages.Achievements[0].Percent != "68.6" {
+		t.Fatalf("unexpected global achievements: %#v", global.AchievementPercentages.Achievements)
+	}
+
+	schema, err := client.API.SteamUserStats.GetSchemaForGame(context.Background(), 550)
+	if err != nil {
+		t.Fatalf("GetSchemaForGame returned error: %v", err)
+	}
+	if schema.Game.GameVersion != "143" || len(schema.Game.AvailableGameStats.Achievements) != 1 {
+		t.Fatalf("unexpected schema: %#v", schema.Game)
+	}
+
+	currentPlayers, err := client.API.SteamUserStats.GetNumberOfCurrentPlayers(context.Background(), 550)
+	if err != nil {
+		t.Fatalf("GetNumberOfCurrentPlayers returned error: %v", err)
+	}
+	if currentPlayers.Response.PlayerCount != 21495 || currentPlayers.Response.Result != 1 {
+		t.Fatalf("unexpected current players response: %#v", currentPlayers.Response)
+	}
+
+	userStats, err := client.API.SteamUserStats.GetUserStatsForGame(context.Background(), "76561198370695025", 550)
+	if err != nil {
+		t.Fatalf("GetUserStatsForGame returned error: %v", err)
+	}
+	if len(userStats.PlayerStats.Achievements) != 1 || len(userStats.PlayerStats.Stats) != 2 || userStats.PlayerStats.Stats[0].Value != 2552 {
+		t.Fatalf("unexpected user stats: %#v", userStats.PlayerStats)
+	}
+}
+
 func TestSteamUserStatsValidation(t *testing.T) {
 	t.Parallel()
 
@@ -2022,6 +2168,21 @@ func TestSteamUserStatsValidation(t *testing.T) {
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 
 	_, err = client.API.SteamUserStats.GetPlayerAchievements(context.Background(), "1", 0, nil)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamUserStats.GetGlobalAchievementPercentagesForApp(context.Background(), 0)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamUserStats.GetSchemaForGame(context.Background(), 0)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamUserStats.GetNumberOfCurrentPlayers(context.Background(), 0)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamUserStats.GetUserStatsForGame(context.Background(), "", 550)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamUserStats.GetUserStatsForGame(context.Background(), "1", 0)
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 
@@ -2036,6 +2197,43 @@ func TestSteamUserStatsAPIResponseError(t *testing.T) {
 	client := newTestClient(t, server.URL)
 	_, err := client.API.SteamUserStats.GetPlayerAchievements(context.Background(), "1", 550, nil)
 	expectKind(t, err, steam.ErrorKindAPIResponse)
+}
+
+func TestSteamWebAPIUtilEndpoints(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ISteamWebAPIUtil/GetServerInfo/v1/":
+			_, _ = w.Write([]byte(`{"servertime":1778308821,"servertimestring":"Fri May  8 23:40:21 2026"}`))
+		case "/ISteamWebAPIUtil/GetSupportedAPIList/v1/":
+			if got := r.URL.Query().Get("key"); got != "test-key" {
+				t.Fatalf("unexpected api key: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"apilist":{"interfaces":[{"name":"ISteamWebAPIUtil","methods":[{"name":"GetServerInfo","version":1,"httpmethod":"GET","parameters":[]},{"name":"GetSupportedAPIList","version":1,"httpmethod":"GET","parameters":[{"name":"key","type":"string","optional":true,"description":"access key"}]}]}]}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	info, err := client.API.SteamWebAPIUtil.GetServerInfo(context.Background())
+	if err != nil {
+		t.Fatalf("GetServerInfo returned error: %v", err)
+	}
+	if info.ServerTime != 1778308821 || info.ServerTimeString != "Fri May  8 23:40:21 2026" {
+		t.Fatalf("unexpected server info: %#v", info)
+	}
+
+	apiList, err := client.API.SteamWebAPIUtil.GetSupportedAPIList(context.Background())
+	if err != nil {
+		t.Fatalf("GetSupportedAPIList returned error: %v", err)
+	}
+	if len(apiList.APIList.Interfaces) != 1 || len(apiList.APIList.Interfaces[0].Methods) != 2 {
+		t.Fatalf("unexpected api list: %#v", apiList.APIList)
+	}
 }
 
 func TestHTTPStatusError(t *testing.T) {
