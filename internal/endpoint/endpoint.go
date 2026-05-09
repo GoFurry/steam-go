@@ -43,6 +43,8 @@ const (
 	SaleFeatureServiceGetFriendsSharedYearInReview            = "/ISaleFeatureService/GetFriendsSharedYearInReview/v1/"
 	SaleFeatureServiceGetUserYearAchievements                 = "/ISaleFeatureService/GetUserYearAchievements/v1/"
 	SaleFeatureServiceGetUserYearInReview                     = "/ISaleFeatureService/GetUserYearInReview/v1/"
+	SteamDirectoryGetCMListForConnect                         = "/ISteamDirectory/GetCMListForConnect/v1/"
+	SteamDirectoryGetSteamPipeDomains                         = "/ISteamDirectory/GetSteamPipeDomains/v1/"
 	SteamAppsGetSDRConfig                                     = "/ISteamApps/GetSDRConfig/v1/"
 	SteamAppsGetServersAtAddress                              = "/ISteamApps/GetServersAtAddress/v1/"
 	SteamAppsUpToDateCheck                                    = "/ISteamApps/UpToDateCheck/v1/"

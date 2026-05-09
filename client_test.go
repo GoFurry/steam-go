@@ -21,6 +21,7 @@ import (
 	"github.com/GoFurry/steam-go/api/questservice"
 	"github.com/GoFurry/steam-go/api/salefeatureservice"
 	"github.com/GoFurry/steam-go/api/steamchartsservice"
+	"github.com/GoFurry/steam-go/api/steamdirectory"
 	"github.com/GoFurry/steam-go/api/steamnews"
 	"github.com/GoFurry/steam-go/api/steamuserstats"
 )
@@ -55,6 +56,9 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	}
 	if client.API.SteamChartsService == nil {
 		t.Fatal("expected steam charts service to be initialized")
+	}
+	if client.API.SteamDirectory == nil {
+		t.Fatal("expected steam directory service to be initialized")
 	}
 }
 
@@ -778,6 +782,75 @@ func TestSteamChartsService(t *testing.T) {
 	}
 	if len(yearTopReleases.Response.TopDLCReleases) != 2 || len(yearTopReleases.Response.TopAppList) != 2 || yearTopReleases.Response.TopAppList[1].AppID != 550 {
 		t.Fatalf("unexpected year top releases: %#v", yearTopReleases.Response)
+	}
+}
+
+func TestSteamDirectory(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ISteamDirectory/GetCMListForConnect/v1/":
+			query := r.URL.Query()
+			if got := query.Get("cellid"); got != "123" {
+				t.Fatalf("unexpected cellid: %s", got)
+			}
+			if got := query.Get("cmtype"); got != "websockets" {
+				t.Fatalf("unexpected cmtype: %s", got)
+			}
+			if got := query.Get("realm"); got != "steamglobal" {
+				t.Fatalf("unexpected realm: %s", got)
+			}
+			if got := query.Get("maxcount"); got != "5" {
+				t.Fatalf("unexpected maxcount: %s", got)
+			}
+			if got := query.Get("qoslevel"); got != "2" {
+				t.Fatalf("unexpected qoslevel: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"serverlist":[{"endpoint":"cmp1-lax1.steamserver.net:443","legacy_endpoint":"cmp2-lax1.steamserver.net:443","type":"websockets","dc":"lax1","realm":"steamglobal","load":18,"wtd_load":12.5522112846374512},{"endpoint":"205.196.6.148:27017","legacy_endpoint":"205.196.6.148:27017","type":"netfilter","dc":"sea1","realm":"steamglobal","load":15,"wtd_load":52.0302999019622803}],"success":true,"message":""}}`))
+		case "/ISteamDirectory/GetSteamPipeDomains/v1/":
+			query := r.URL.Query()
+			if got := query.Get("key"); got != "test-key" {
+				t.Fatalf("unexpected api key: %s", got)
+			}
+			if len(query) != 1 {
+				t.Fatalf("unexpected query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"response":{"domainlist":["*.steamcontent.com","cs.steampowered.com","fastly.cdn.steampipe.steamcontent.com"],"result":1,"message":""}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	cellID := uint32(123)
+	maxCount := uint32(5)
+	qosLevel := uint32(2)
+	cmList, err := client.API.SteamDirectory.GetCMListForConnect(context.Background(), &steamdirectory.GetCMListForConnectOptions{
+		CellID:   &cellID,
+		CMType:   "websockets",
+		Realm:    "steamglobal",
+		MaxCount: &maxCount,
+		QOSLevel: &qosLevel,
+	})
+	if err != nil {
+		t.Fatalf("GetCMListForConnect returned error: %v", err)
+	}
+	if !cmList.Response.Success || len(cmList.Response.ServerList) != 2 {
+		t.Fatalf("unexpected cm list: %#v", cmList.Response)
+	}
+	if cmList.Response.ServerList[0].DC != "lax1" || cmList.Response.ServerList[1].WTDLoad <= 0 {
+		t.Fatalf("unexpected cm server list: %#v", cmList.Response.ServerList)
+	}
+
+	steamPipeDomains, err := client.API.SteamDirectory.GetSteamPipeDomains(context.Background())
+	if err != nil {
+		t.Fatalf("GetSteamPipeDomains returned error: %v", err)
+	}
+	if steamPipeDomains.Response.Result != 1 || len(steamPipeDomains.Response.DomainList) != 3 {
+		t.Fatalf("unexpected steam pipe domains: %#v", steamPipeDomains.Response)
 	}
 }
 

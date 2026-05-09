@@ -14,6 +14,7 @@ This directory keeps reference-style documentation that is too detailed for the 
 - `client.API.PlayerService`
 - `client.API.QuestService`
 - `client.API.SaleFeatureService`
+- `client.API.SteamDirectory`
 - `client.API.SteamApps`
 - `client.API.SteamChartsService`
 - `client.API.SteamNews`
@@ -69,6 +70,11 @@ These are not exhaustive lists, but they reflect the main typed SDK coverage ava
 - `GetFriendsSharedYearInReview`
 - `GetUserYearAchievements`
 - `GetUserYearInReview`
+
+### `client.API.SteamDirectory`
+
+- `GetCMListForConnect`
+- `GetSteamPipeDomains`
 
 ### `client.API.SteamApps`
 
