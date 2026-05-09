@@ -19,6 +19,8 @@ Run a specific API-group smoke test with:
 - `go run ./test/playerservice`
 - `go run ./test/questservice`
 - `go run ./test/salefeatureservice`
+- `go run ./test/steamapps`
+- `go run ./test/steamchartsservice`
 - `go run ./test/steamnews`
 - `go run ./test/steamuser`
 - `go run ./test/steamuserstats`

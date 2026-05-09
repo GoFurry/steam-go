@@ -13,6 +13,8 @@ import (
 	"github.com/GoFurry/steam-go/api/playerservice"
 	"github.com/GoFurry/steam-go/api/questservice"
 	"github.com/GoFurry/steam-go/api/salefeatureservice"
+	"github.com/GoFurry/steam-go/api/steamapps"
+	"github.com/GoFurry/steam-go/api/steamchartsservice"
 	"github.com/GoFurry/steam-go/api/steamnews"
 	"github.com/GoFurry/steam-go/api/steamuser"
 	"github.com/GoFurry/steam-go/api/steamuserstats"
@@ -38,6 +40,8 @@ type API struct {
 	NewsService               *newsservice.Service
 	QuestService              *questservice.Service
 	SaleFeatureService        *salefeatureservice.Service
+	SteamApps                 *steamapps.Service
+	SteamChartsService        *steamchartsservice.Service
 	SteamUser                 *steamuser.Service
 	PlayerService             *playerservice.Service
 	SteamNews                 *steamnews.Service
@@ -83,6 +87,8 @@ func NewClient(opts ...Option) (*Client, error) {
 		NewsService:               newsservice.NewService(executor),
 		QuestService:              questservice.NewService(executor),
 		SaleFeatureService:        salefeatureservice.NewService(executor),
+		SteamApps:                 steamapps.NewService(executor),
+		SteamChartsService:        steamchartsservice.NewService(executor),
 		SteamUser:                 steamuser.NewService(executor),
 		PlayerService:             playerservice.NewService(executor),
 		SteamNews:                 steamnews.NewService(executor),

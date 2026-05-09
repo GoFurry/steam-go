@@ -100,6 +100,33 @@ func (s *Service) GetUserYearAchievementsRaw(ctx context.Context, accessToken st
 	})
 }
 
+// GetUserYearInReview returns the public Year in Review summary for the given player and year.
+func (s *Service) GetUserYearInReview(ctx context.Context, steamID string, year uint32) (GetUserYearInReviewResponse, error) {
+	body, err := s.GetUserYearInReviewRaw(ctx, steamID, year)
+	if err != nil {
+		return GetUserYearInReviewResponse{}, err
+	}
+	return response.DecodeJSON[GetUserYearInReviewResponse](body)
+}
+
+// GetUserYearInReviewRaw returns the raw JSON response body.
+func (s *Service) GetUserYearInReviewRaw(ctx context.Context, steamID string, year uint32) ([]byte, error) {
+	query, err := buildSteamIDQuery(steamID)
+	if err != nil {
+		return nil, err
+	}
+	if year == 0 {
+		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "year must be greater than zero", nil, nil)
+	}
+	query.Set("year", strconv.FormatUint(uint64(year), 10))
+
+	return s.executor.DoRaw(ctx, request.RequestSpec{
+		Method: http.MethodGet,
+		Path:   endpoint.SaleFeatureServiceGetUserYearInReview,
+		Query:  query,
+	})
+}
+
 func buildSteamIDQuery(steamID string) (url.Values, error) {
 	trimmed := strings.TrimSpace(steamID)
 	if trimmed == "" {

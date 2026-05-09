@@ -20,6 +20,7 @@ import (
 	"github.com/GoFurry/steam-go/api/playerservice"
 	"github.com/GoFurry/steam-go/api/questservice"
 	"github.com/GoFurry/steam-go/api/salefeatureservice"
+	"github.com/GoFurry/steam-go/api/steamchartsservice"
 	"github.com/GoFurry/steam-go/api/steamnews"
 	"github.com/GoFurry/steam-go/api/steamuserstats"
 )
@@ -48,6 +49,12 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	}
 	if client.API.QuestService == nil || client.API.SaleFeatureService == nil {
 		t.Fatal("expected quest and sale feature services to be initialized")
+	}
+	if client.API.SteamApps == nil {
+		t.Fatal("expected steam apps service to be initialized")
+	}
+	if client.API.SteamChartsService == nil {
+		t.Fatal("expected steam charts service to be initialized")
 	}
 }
 
@@ -460,6 +467,15 @@ func TestSaleFeatureService(t *testing.T) {
 				t.Fatalf("unexpected total_only: %s", got)
 			}
 			_, _ = w.Write([]byte(`{"response":{"game_achievements":[{"appid":550,"achievements":[{"statid":0,"fieldid":0,"achievement_name_internal":"ACH_HONK_A_CLOWNS_NOSE"}],"all_time_unlocked_achievements":95,"unlocked_more_in_future":true}],"total_achievements":41,"total_rare_achievements":33,"total_games_with_achievements":1}}`))
+		case "/ISaleFeatureService/GetUserYearInReview/v1/":
+			query := r.URL.Query()
+			if got := query.Get("steamid"); got != "76561198370695025" {
+				t.Fatalf("unexpected steamid: %s", got)
+			}
+			if got := query.Get("year"); got != "2025" {
+				t.Fatalf("unexpected year: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"stats":{"account_id":410429297,"year":2025,"playtime_stats":{"total_stats":{"total_playtime_seconds":1483455,"total_sessions":617,"windows_sessions":617,"total_playtime_percentagex100":10000,"windows_playtime_percentagex100":10000},"games":[{"appid":550,"stats":{"total_playtime_seconds":506679,"total_sessions":144,"windows_sessions":144,"total_playtime_percentagex100":3415,"windows_playtime_percentagex100":3415},"playtime_streak":{"longest_consecutive_days":10,"rtime_start":1764892800},"playtime_ranks":{"overall_rank":1,"windows_rank":1},"rtime_first_played":1737819327,"relative_game_stats":{"total_playtime_seconds":506679,"total_sessions":144,"windows_sessions":144,"total_playtime_percentagex100":10000,"windows_playtime_percentagex100":10000}}],"playtime_streak":{"longest_consecutive_days":15,"rtime_start":1746921600},"months":[],"game_summary":[{"appid":550,"new_this_year":false,"rtime_first_played_lifetime":1503739346,"demo":false,"playtest":false,"played_vr":false,"played_deck":false,"played_controller":false,"played_linux":false,"played_mac":false,"played_windows":true,"total_playtime_percentagex100":3415,"total_sessions":144,"rtime_release_date":1258434000}]},"demos_played":83,"playtests_played":2,"summary_stats":{"total_achievements":493,"total_games_with_achievements":48,"total_rare_achievements":32},"substantial":true,"by_numbers":{"screenshots_shared":225},"game_rankings":{"overall_ranking":{"category":"overall","rankings":[{"appid":550,"rank":1,"relative_playtime_percentagex100":520}]}}},"performance_stats":{"from_dbo":true,"overall_time_ms":"0"},"distribution":{"new_releases":14,"recent_releases":44,"classic_releases":40,"recent_cutoff_year":7}}}`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -505,6 +521,24 @@ func TestSaleFeatureService(t *testing.T) {
 	if yearAchievements.Response.TotalAchievements != 41 || len(yearAchievements.Response.GameAchievements) != 1 {
 		t.Fatalf("unexpected year achievements: %#v", yearAchievements.Response)
 	}
+
+	yearInReview, err := client.API.SaleFeatureService.GetUserYearInReview(
+		context.Background(),
+		"76561198370695025",
+		2025,
+	)
+	if err != nil {
+		t.Fatalf("GetUserYearInReview returned error: %v", err)
+	}
+	if yearInReview.Response.Stats.AccountID != 410429297 {
+		t.Fatalf("unexpected account id: %d", yearInReview.Response.Stats.AccountID)
+	}
+	if len(yearInReview.Response.Stats.PlaytimeStats.Games) != 1 {
+		t.Fatalf("unexpected playtime games: %#v", yearInReview.Response.Stats.PlaytimeStats.Games)
+	}
+	if yearInReview.Response.Distribution.RecentReleases != 44 {
+		t.Fatalf("unexpected distribution: %#v", yearInReview.Response.Distribution)
+	}
 }
 
 func TestSaleFeatureServiceValidation(t *testing.T) {
@@ -545,6 +579,206 @@ func TestSaleFeatureServiceValidation(t *testing.T) {
 		AppIDs:  []uint32{0},
 	})
 	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SaleFeatureService.GetUserYearInReview(context.Background(), "", 2025)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SaleFeatureService.GetUserYearInReview(context.Background(), "76561198370695025", 0)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+}
+
+func TestSteamApps(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ISteamApps/GetSDRConfig/v1/":
+			if got := r.URL.Query().Get("appid"); got != "550" {
+				t.Fatalf("unexpected appid: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"revision":1774928217,"pops":{"ams":{"desc":"Amsterdam (Netherlands)","geo":[4.9,52.37],"partners":1,"tier":1,"relays":[{"ipv4":"155.133.248.36","port_range":[27015,27060]}]},"eat":{"aliases":["mwh"],"desc":"Wenatchee (Washington)","geo":[-120.32,47.47],"partners":3,"tier":1}},"certs":["cert-a"],"p2p_share_ip":{"cn":20,"default":40},"relay_public_key":"relay-key","revoked_keys":["11146342570456886677"],"typical_pings":[["ams","fra",5],["eat","sea",3]],"success":true}`))
+		case "/ISteamApps/GetServersAtAddress/v1/":
+			if got := r.URL.Query().Get("addr"); got != "45.125.45.95" {
+				t.Fatalf("unexpected addr: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"success":true,"servers":[{"addr":"45.125.45.95:28000","gmsindex":-1,"steamid":"90285522207964181","appid":550,"gamedir":"left4dead2","region":255,"secure":true,"lan":false,"gameport":28000,"specport":0},{"addr":"45.125.45.95:40000","gmsindex":-1,"steamid":"90285514591065109","appid":550,"gamedir":"left4dead2","region":255,"secure":false,"lan":false,"gameport":40000,"specport":0}]}}`))
+		case "/ISteamApps/UpToDateCheck/v1/":
+			query := r.URL.Query()
+			if got := query.Get("appid"); got != "550" {
+				t.Fatalf("unexpected appid: %s", got)
+			}
+			if got := query.Get("version"); got != "1" {
+				t.Fatalf("unexpected version: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"success":true,"up_to_date":false,"version_is_listable":false,"required_version":2243,"message":"Your server is out of date, please update."}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	sdrConfig, err := client.API.SteamApps.GetSDRConfig(context.Background(), 550)
+	if err != nil {
+		t.Fatalf("GetSDRConfig returned error: %v", err)
+	}
+	if !sdrConfig.Success || sdrConfig.Revision != 1774928217 {
+		t.Fatalf("unexpected sdr config: %#v", sdrConfig)
+	}
+	if sdrConfig.Pops["ams"].Relays[0].IPv4 != "155.133.248.36" {
+		t.Fatalf("unexpected ams relay: %#v", sdrConfig.Pops["ams"].Relays)
+	}
+	if len(sdrConfig.TypicalPings) != 2 || sdrConfig.TypicalPings[0].FromPOP != "ams" || sdrConfig.TypicalPings[0].PingMS != 5 {
+		t.Fatalf("unexpected typical pings: %#v", sdrConfig.TypicalPings)
+	}
+
+	serversAtAddress, err := client.API.SteamApps.GetServersAtAddress(context.Background(), "45.125.45.95")
+	if err != nil {
+		t.Fatalf("GetServersAtAddress returned error: %v", err)
+	}
+	if !serversAtAddress.Response.Success || len(serversAtAddress.Response.Servers) != 2 {
+		t.Fatalf("unexpected servers at address: %#v", serversAtAddress.Response)
+	}
+	if serversAtAddress.Response.Servers[1].GamePort != 40000 {
+		t.Fatalf("unexpected server game port: %#v", serversAtAddress.Response.Servers[1])
+	}
+
+	upToDate, err := client.API.SteamApps.UpToDateCheck(context.Background(), 550, 1)
+	if err != nil {
+		t.Fatalf("UpToDateCheck returned error: %v", err)
+	}
+	if upToDate.Response.UpToDate || upToDate.Response.RequiredVersion != 2243 {
+		t.Fatalf("unexpected up-to-date response: %#v", upToDate.Response)
+	}
+}
+
+func TestSteamAppsValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := steam.NewClient(steam.WithAPIKey("test-key"))
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	_, err = client.API.SteamApps.GetSDRConfig(context.Background(), 0)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamApps.GetServersAtAddress(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamApps.UpToDateCheck(context.Background(), 0, 1)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.SteamApps.UpToDateCheck(context.Background(), 550, 0)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+}
+
+func TestSteamChartsService(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ISteamChartsService/GetBestOfYearPages/v1/":
+			_, _ = w.Write([]byte(`{"response":{"pages":[{"name":"Best of Steam - 2024","url_path":"bestof2024","banner_url":["a.jpg",""],"banner_url_mobile":["m-a.jpg",""],"start_date":1730444400},{"name":"Best of Steam - 2023","url_path":"BestOf2023","banner_url":["b.png"],"banner_url_mobile":["m-b.jpg"],"start_date":1698822000}]}}`))
+		case "/ISteamChartsService/GetGamesByConcurrentPlayers/v1/":
+			_, _ = w.Write([]byte(`{"response":{"last_update":1778304619,"ranks":[{"rank":1,"appid":730,"concurrent_in_game":659296,"peak_in_game":1321704},{"rank":40,"appid":550,"concurrent_in_game":28622,"peak_in_game":36066}]}}`))
+		case "/ISteamChartsService/GetMonthTopAppReleases/v1/":
+			query := r.URL.Query()
+			if got := query.Get("rtime_month"); got != "1746769043" {
+				t.Fatalf("unexpected rtime_month: %s", got)
+			}
+			if got := query.Get("include_dlc"); got != "true" {
+				t.Fatalf("unexpected include_dlc: %s", got)
+			}
+			if got := query.Get("top_results_limit"); got != "10" {
+				t.Fatalf("unexpected top_results_limit: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"top_dlc_releases":[{"appid":2873470,"rtime_release":1747008000,"app_release_rank":1},{"appid":2974970,"rtime_release":1747353600,"app_release_rank":1}],"top_combined_app_and_dlc_releases":[{"appid":490110,"rtime_release":1747094400,"app_release_rank":1},{"appid":1153410,"rtime_release":1747785600,"app_release_rank":1}]}}`))
+		case "/ISteamChartsService/GetMostPlayedGames/v1/":
+			_, _ = w.Write([]byte(`{"response":{"rollup_date":1778198400,"ranks":[{"rank":1,"appid":730,"last_week_rank":1,"peak_in_game":1321704},{"rank":34,"appid":550,"last_week_rank":31,"peak_in_game":29429}]}}`))
+		case "/ISteamChartsService/GetTopReleasesPages/v1/":
+			_, _ = w.Write([]byte(`{"response":{"pages":[{"name":"Top Releases of February 2025","start_of_month":1738396800,"url_path":"top_february_2025","item_ids":[{"appid":2246340},{"appid":1771300}]},{"name":"Top Releases of January 2025","start_of_month":1738396800,"url_path":"top_january_2025","item_ids":[{"appid":2384580}]}]}}`))
+		case "/ISteamChartsService/GetYearTopAppReleases/v1/":
+			query := r.URL.Query()
+			if got := query.Get("rtime_year"); got != "1746769043" {
+				t.Fatalf("unexpected rtime_year: %s", got)
+			}
+			if got := query.Get("include_dlc"); got != "true" {
+				t.Fatalf("unexpected include_dlc: %s", got)
+			}
+			if got := query.Get("top_results_limit"); got != "20" {
+				t.Fatalf("unexpected top_results_limit: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"top_dlc_releases":[{"appid":3067190,"rtime_release":1762214400,"app_release_rank":1},{"appid":3080080,"rtime_release":1746489600,"app_release_rank":1}],"top_combined_app_and_dlc_releases":[{"appid":1903340,"rtime_release":1745452800,"app_release_rank":1},{"appid":1984270,"rtime_release":1759363200,"app_release_rank":1}],"top_app_list":[{"appid":730,"app_release_rank":4,"type":1},{"appid":550,"app_release_rank":4,"type":2}]}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	bestOfYearPages, err := client.API.SteamChartsService.GetBestOfYearPages(context.Background())
+	if err != nil {
+		t.Fatalf("GetBestOfYearPages returned error: %v", err)
+	}
+	if len(bestOfYearPages.Response.Pages) != 2 || bestOfYearPages.Response.Pages[0].URLPath != "bestof2024" {
+		t.Fatalf("unexpected best-of-year pages: %#v", bestOfYearPages.Response.Pages)
+	}
+
+	concurrentPlayers, err := client.API.SteamChartsService.GetGamesByConcurrentPlayers(context.Background())
+	if err != nil {
+		t.Fatalf("GetGamesByConcurrentPlayers returned error: %v", err)
+	}
+	if concurrentPlayers.Response.LastUpdate != 1778304619 || len(concurrentPlayers.Response.Ranks) != 2 {
+		t.Fatalf("unexpected concurrent players: %#v", concurrentPlayers.Response)
+	}
+
+	rtimeMonth := uint32(1746769043)
+	monthLimit := uint32(10)
+	includeDLC := true
+	monthTopReleases, err := client.API.SteamChartsService.GetMonthTopAppReleases(context.Background(), &steamchartsservice.GetMonthTopAppReleasesOptions{
+		RTimeMonth:      &rtimeMonth,
+		IncludeDLC:      &includeDLC,
+		TopResultsLimit: &monthLimit,
+	})
+	if err != nil {
+		t.Fatalf("GetMonthTopAppReleases returned error: %v", err)
+	}
+	if len(monthTopReleases.Response.TopDLCReleases) != 2 || monthTopReleases.Response.TopCombinedAppAndDLCReleases[0].AppID != 490110 {
+		t.Fatalf("unexpected month top releases: %#v", monthTopReleases.Response)
+	}
+
+	mostPlayedGames, err := client.API.SteamChartsService.GetMostPlayedGames(context.Background())
+	if err != nil {
+		t.Fatalf("GetMostPlayedGames returned error: %v", err)
+	}
+	if mostPlayedGames.Response.RollupDate != 1778198400 || mostPlayedGames.Response.Ranks[1].LastWeekRank != 31 {
+		t.Fatalf("unexpected most played games: %#v", mostPlayedGames.Response)
+	}
+
+	topReleasesPages, err := client.API.SteamChartsService.GetTopReleasesPages(context.Background())
+	if err != nil {
+		t.Fatalf("GetTopReleasesPages returned error: %v", err)
+	}
+	if len(topReleasesPages.Response.Pages) != 2 || topReleasesPages.Response.Pages[0].ItemIDs[0].AppID != 2246340 {
+		t.Fatalf("unexpected top releases pages: %#v", topReleasesPages.Response.Pages)
+	}
+
+	rtimeYear := uint32(1746769043)
+	yearLimit := uint32(20)
+	yearTopReleases, err := client.API.SteamChartsService.GetYearTopAppReleases(context.Background(), &steamchartsservice.GetYearTopAppReleasesOptions{
+		RTimeYear:       &rtimeYear,
+		IncludeDLC:      &includeDLC,
+		TopResultsLimit: &yearLimit,
+	})
+	if err != nil {
+		t.Fatalf("GetYearTopAppReleases returned error: %v", err)
+	}
+	if len(yearTopReleases.Response.TopDLCReleases) != 2 || len(yearTopReleases.Response.TopAppList) != 2 || yearTopReleases.Response.TopAppList[1].AppID != 550 {
+		t.Fatalf("unexpected year top releases: %#v", yearTopReleases.Response)
+	}
 }
 
 func TestSteamUserGetPlayerSummaries(t *testing.T) {

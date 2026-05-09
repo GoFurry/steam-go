@@ -35,6 +35,22 @@ func main() {
 	}
 	fmt.Printf("friend_shares=%d\n", len(friendSharesResp.Response.FriendShares))
 
+	fmt.Println("\n== SaleFeatureService.GetUserYearInReview ==")
+	yearInReviewResp, err := client.API.SaleFeatureService.GetUserYearInReview(
+		ctx,
+		realtest.DefaultSteamID,
+		2025,
+	)
+	if err != nil {
+		realtest.Fatalf("GetUserYearInReview failed: %v", err)
+	}
+	fmt.Printf("account_id=%d substantial=%t total_playtime_seconds=%d games=%d\n",
+		yearInReviewResp.Response.Stats.AccountID,
+		yearInReviewResp.Response.Stats.Substantial,
+		yearInReviewResp.Response.Stats.PlaytimeStats.TotalStats.TotalPlaytimeSeconds,
+		len(yearInReviewResp.Response.Stats.PlaytimeStats.Games),
+	)
+
 	if !realtest.RequireAccessToken(cfg) {
 		return
 	}

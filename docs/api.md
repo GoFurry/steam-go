@@ -14,6 +14,8 @@ This directory keeps reference-style documentation that is too detailed for the 
 - `client.API.PlayerService`
 - `client.API.QuestService`
 - `client.API.SaleFeatureService`
+- `client.API.SteamApps`
+- `client.API.SteamChartsService`
 - `client.API.SteamNews`
 - `client.API.SteamUser`
 - `client.API.SteamUserStats`
@@ -66,6 +68,22 @@ These are not exhaustive lists, but they reflect the main typed SDK coverage ava
 
 - `GetFriendsSharedYearInReview`
 - `GetUserYearAchievements`
+- `GetUserYearInReview`
+
+### `client.API.SteamApps`
+
+- `GetSDRConfig`
+- `GetServersAtAddress`
+- `UpToDateCheck`
+
+### `client.API.SteamChartsService`
+
+- `GetBestOfYearPages`
+- `GetGamesByConcurrentPlayers`
+- `GetMonthTopAppReleases`
+- `GetMostPlayedGames`
+- `GetTopReleasesPages`
+- `GetYearTopAppReleases`
 
 ## Credential Notes
 
