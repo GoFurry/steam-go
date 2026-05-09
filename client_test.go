@@ -29,6 +29,7 @@ import (
 	"github.com/GoFurry/steam-go/api/steamuserstats"
 	"github.com/GoFurry/steam-go/api/storeservice"
 	"github.com/GoFurry/steam-go/api/userstorevisitservice"
+	"github.com/GoFurry/steam-go/api/wishlistservice"
 )
 
 func TestNewClientRequiresAPIKey(t *testing.T) {
@@ -85,6 +86,9 @@ func TestNewClientRequiresAPIKey(t *testing.T) {
 	}
 	if client.API.UserAccountService == nil || client.API.UserReviewsService == nil || client.API.UserStoreVisitService == nil {
 		t.Fatal("expected user account, review, and store visit services to be initialized")
+	}
+	if client.API.WishlistService == nil {
+		t.Fatal("expected wishlist service to be initialized")
 	}
 }
 
@@ -2576,6 +2580,114 @@ func TestUserStoreVisitService(t *testing.T) {
 	}
 }
 
+func TestWishlistService(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/IWishlistService/GetWishlist/v1/":
+			if got := r.URL.Query().Get("steamid"); got != "76561198370695025" {
+				t.Fatalf("unexpected steamid: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"items":[{"appid":4000,"priority":2,"date_added":1494672274},{"appid":25000,"priority":0,"date_added":1717842914}]}}`))
+		case "/IWishlistService/GetWishlistItemCount/v1/":
+			if got := r.URL.Query().Get("steamid"); got != "76561198370695025" {
+				t.Fatalf("unexpected steamid: %s", got)
+			}
+			_, _ = w.Write([]byte(`{"response":{"count":1119}}`))
+		case "/IWishlistService/GetWishlistItemsOnSale/v1/":
+			query := r.URL.Query()
+			if got := query.Get("access_token"); got != "user-token" {
+				t.Fatalf("unexpected access token: %s", got)
+			}
+			if got := query.Get("key"); got != "test-key" {
+				t.Fatalf("unexpected api key: %s", got)
+			}
+			var payload struct {
+				Context struct {
+					CountryCode string `json:"country_code"`
+				} `json:"context"`
+				DataRequest map[string]any `json:"data_request"`
+			}
+			if err := json.Unmarshal([]byte(query.Get("input_json")), &payload); err != nil {
+				t.Fatalf("unmarshal input_json failed: %v", err)
+			}
+			if payload.Context.CountryCode != "CN" {
+				t.Fatalf("unexpected country code: %s", payload.Context.CountryCode)
+			}
+			if got, ok := payload.DataRequest["include_assets"].(bool); !ok || !got {
+				t.Fatalf("unexpected include_assets: %#v", payload.DataRequest["include_assets"])
+			}
+			if got, ok := payload.DataRequest["include_tag_count"].(string); !ok || got != "5" {
+				t.Fatalf("unexpected include_tag_count: %#v", payload.DataRequest["include_tag_count"])
+			}
+			_, _ = w.Write([]byte(`{"response":{"items":[{"appid":1086940,"store_item":{"name":"Baldur's Gate 3"}},{"appid":813230,"store_item":{"name":"ANIMAL WELL"}}],"total_items_on_sale":43}}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithAccessToken("global-token"),
+		steam.WithBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	wishlist, err := client.API.WishlistService.GetWishlist(context.Background(), "76561198370695025")
+	if err != nil {
+		t.Fatalf("GetWishlist returned error: %v", err)
+	}
+	if len(wishlist.Response.Items) != 2 || wishlist.Response.Items[0].AppID != 4000 {
+		t.Fatalf("unexpected wishlist items: %#v", wishlist.Response.Items)
+	}
+
+	count, err := client.API.WishlistService.GetWishlistItemCount(context.Background(), "76561198370695025")
+	if err != nil {
+		t.Fatalf("GetWishlistItemCount returned error: %v", err)
+	}
+	if count.Response.Count != 1119 {
+		t.Fatalf("unexpected wishlist count: %#v", count.Response)
+	}
+
+	trueValue := true
+	onSale, err := client.API.WishlistService.GetWishlistItemsOnSale(
+		context.Background(),
+		"user-token",
+		"CN",
+		&wishlistservice.GetWishlistItemsOnSaleOptions{
+			IncludeAssets:                 &trueValue,
+			IncludeRelease:                &trueValue,
+			IncludePlatforms:              &trueValue,
+			IncludeAllPurchaseOptions:     &trueValue,
+			IncludeScreenshots:            &trueValue,
+			IncludeTrailers:               &trueValue,
+			IncludeRatings:                &trueValue,
+			IncludeTagCount:               "5",
+			IncludeReviews:                &trueValue,
+			IncludeBasicInfo:              &trueValue,
+			IncludeSupportedLanguages:     &trueValue,
+			IncludeFullDescription:        &trueValue,
+			IncludeIncludedItems:          &trueValue,
+			IncludeAssetsWithoutOverrides: &trueValue,
+			ApplyUserFilters:              &trueValue,
+			IncludeLinks:                  &trueValue,
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetWishlistItemsOnSale returned error: %v", err)
+	}
+	if len(onSale.Response.Items) != 2 || onSale.Response.Items[1].AppID != 813230 {
+		t.Fatalf("unexpected on-sale items: %#v", onSale.Response.Items)
+	}
+	if onSale.Response.TotalItemsOnSale != 43 {
+		t.Fatalf("unexpected total_items_on_sale: %d", onSale.Response.TotalItemsOnSale)
+	}
+}
+
 func TestUserScopedServicesValidation(t *testing.T) {
 	t.Parallel()
 
@@ -2600,6 +2712,18 @@ func TestUserScopedServicesValidation(t *testing.T) {
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 
 	_, err = client.API.UserStoreVisitService.GetMostVisitedItemsOnStore(context.Background(), "", nil)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.WishlistService.GetWishlist(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.WishlistService.GetWishlistItemCount(context.Background(), "")
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.WishlistService.GetWishlistItemsOnSale(context.Background(), "", "CN", nil)
+	expectKind(t, err, steam.ErrorKindRequestBuild)
+
+	_, err = client.API.WishlistService.GetWishlistItemsOnSale(context.Background(), "user-token", "", nil)
 	expectKind(t, err, steam.ErrorKindRequestBuild)
 }
 

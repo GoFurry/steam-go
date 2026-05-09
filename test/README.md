@@ -36,3 +36,4 @@ Run a specific API-group smoke test with:
 - `go run ./test/useraccountservice`
 - `go run ./test/userreviewsservice`
 - `go run ./test/userstorevisitservice`
+- `go run ./test/wishlistservice`

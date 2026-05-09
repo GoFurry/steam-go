@@ -85,4 +85,7 @@ const (
 	UserReviewsServiceGetFriendsRecommendedApp                = "/IUserReviewsService/GetFriendsRecommendedApp/v1/"
 	UserStoreVisitServiceGetFrequentlyVisitedPages            = "/IUserStoreVisitService/GetFrequentlyVisitedPages/v1/"
 	UserStoreVisitServiceGetMostVisitedItemsOnStore           = "/IUserStoreVisitService/GetMostVisitedItemsOnStore/v1/"
+	WishlistServiceGetWishlist                                = "/IWishlistService/GetWishlist/v1/"
+	WishlistServiceGetWishlistItemCount                       = "/IWishlistService/GetWishlistItemCount/v1/"
+	WishlistServiceGetWishlistItemsOnSale                     = "/IWishlistService/GetWishlistItemsOnSale/v1/"
 )

@@ -30,6 +30,7 @@ import (
 	"github.com/GoFurry/steam-go/api/useraccountservice"
 	"github.com/GoFurry/steam-go/api/userreviewsservice"
 	"github.com/GoFurry/steam-go/api/userstorevisitservice"
+	"github.com/GoFurry/steam-go/api/wishlistservice"
 	"github.com/GoFurry/steam-go/internal/request"
 	"github.com/GoFurry/steam-go/internal/transport"
 )
@@ -67,6 +68,7 @@ type API struct {
 	UserAccountService        *useraccountservice.Service
 	UserReviewsService        *userreviewsservice.Service
 	UserStoreVisitService     *userstorevisitservice.Service
+	WishlistService           *wishlistservice.Service
 	PlayerService             *playerservice.Service
 	SteamNews                 *steamnews.Service
 	SteamUserStats            *steamuserstats.Service
@@ -126,6 +128,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		UserAccountService:        useraccountservice.NewService(executor),
 		UserReviewsService:        userreviewsservice.NewService(executor),
 		UserStoreVisitService:     userstorevisitservice.NewService(executor),
+		WishlistService:           wishlistservice.NewService(executor),
 		PlayerService:             playerservice.NewService(executor),
 		SteamNews:                 steamnews.NewService(executor),
 		SteamUserStats:            steamuserstats.NewService(executor),

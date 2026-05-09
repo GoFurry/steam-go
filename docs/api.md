@@ -31,6 +31,7 @@ This directory keeps reference-style documentation that is too detailed for the 
 - `client.API.UserAccountService`
 - `client.API.UserReviewsService`
 - `client.API.UserStoreVisitService`
+- `client.API.WishlistService`
 
 ## Selected Endpoint Coverage
 
@@ -173,6 +174,12 @@ These are not exhaustive lists, but they reflect the main typed SDK coverage ava
 
 - `GetFrequentlyVisitedPages`
 - `GetMostVisitedItemsOnStore`
+
+### `client.API.WishlistService`
+
+- `GetWishlist`
+- `GetWishlistItemCount`
+- `GetWishlistItemsOnSale`
 
 ## Credential Notes
 
