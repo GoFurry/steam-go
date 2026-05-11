@@ -15,6 +15,12 @@ type ProxySelector interface {
 	Next(req *http.Request) (*url.URL, error)
 }
 
+// RateLimiterConfig defines one token-bucket limiter.
+type RateLimiterConfig struct {
+	Limit rate.Limit
+	Burst int
+}
+
 // Client applies retry and rate limiting on top of an http.Client.
 type Client struct {
 	httpClient *http.Client
@@ -22,10 +28,10 @@ type Client struct {
 }
 
 // New creates a transport client.
-func New(httpClient *http.Client, requestsPerSecond int) *Client {
+func New(httpClient *http.Client, cfg RateLimiterConfig) *Client {
 	var limiter *rate.Limiter
-	if requestsPerSecond > 0 {
-		limiter = rate.NewLimiter(rate.Limit(requestsPerSecond), requestsPerSecond)
+	if cfg.Limit > 0 && cfg.Burst > 0 {
+		limiter = rate.NewLimiter(cfg.Limit, cfg.Burst)
 	}
 	return &Client{
 		httpClient: httpClient,

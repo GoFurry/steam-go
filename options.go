@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/GoFurry/steam-go/internal/auth"
+	"github.com/GoFurry/steam-go/internal/transport"
+	"golang.org/x/time/rate"
 )
 
 const defaultBaseURL = "https://api.steampowered.com"
@@ -27,15 +29,15 @@ type AccessTokenProvider = auth.AccessTokenProvider
 type Option func(*clientConfig) error
 
 type clientConfig struct {
-	apiKeyProvider      APIKeyProvider
-	accessTokenProvider AccessTokenProvider
-	baseURL             string
-	httpClient          *http.Client
-	timeout             time.Duration
-	retry               int
-	rateLimit           int
+	apiKeyProvider       APIKeyProvider
+	accessTokenProvider  AccessTokenProvider
+	baseURL              string
+	httpClient           *http.Client
+	timeout              time.Duration
+	retry                int
+	rateLimiter          transport.RateLimiterConfig
 	maxResponseBodyBytes int64
-	proxySelector       ProxySelector
+	proxySelector        ProxySelector
 }
 
 func defaultClientConfig() clientConfig {
@@ -43,7 +45,6 @@ func defaultClientConfig() clientConfig {
 		baseURL:              defaultBaseURL,
 		timeout:              10 * time.Second,
 		retry:                0,
-		rateLimit:            0,
 		maxResponseBodyBytes: 16 << 20,
 	}
 }
@@ -164,7 +165,40 @@ func WithRateLimit(requestsPerSecond int) Option {
 		if requestsPerSecond < 0 {
 			return fmt.Errorf("rate limit must not be negative")
 		}
-		cfg.rateLimit = requestsPerSecond
+		if requestsPerSecond == 0 {
+			cfg.rateLimiter = transport.RateLimiterConfig{}
+			return nil
+		}
+		cfg.rateLimiter = transport.RateLimiterConfig{
+			Limit: rate.Limit(requestsPerSecond),
+			Burst: requestsPerSecond,
+		}
+		return nil
+	}
+}
+
+// WithRateLimiter enables an explicit token-bucket limiter.
+//
+// Pass zero values for both limit and burst to disable rate limiting.
+func WithRateLimiter(limit rate.Limit, burst int) Option {
+	return func(cfg *clientConfig) error {
+		if limit < 0 {
+			return fmt.Errorf("rate limit must not be negative")
+		}
+		if burst < 0 {
+			return fmt.Errorf("rate limiter burst must not be negative")
+		}
+		if limit == 0 || burst == 0 {
+			if limit == 0 && burst == 0 {
+				cfg.rateLimiter = transport.RateLimiterConfig{}
+				return nil
+			}
+			return fmt.Errorf("rate limiter limit and burst must both be zero to disable")
+		}
+		cfg.rateLimiter = transport.RateLimiterConfig{
+			Limit: limit,
+			Burst: burst,
+		}
 		return nil
 	}
 }
