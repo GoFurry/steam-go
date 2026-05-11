@@ -112,6 +112,87 @@ func TestNewRoundRobinProxySelectorRejectsInvalidURL(t *testing.T) {
 	}
 }
 
+func TestDefaultProxyHealthConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := steam.DefaultProxyHealthConfig()
+	if cfg.FailureThreshold != 2 {
+		t.Fatalf("unexpected failure threshold: %d", cfg.FailureThreshold)
+	}
+	if cfg.Cooldown != 30*time.Second {
+		t.Fatalf("unexpected cooldown: %s", cfg.Cooldown)
+	}
+}
+
+func TestNewHealthCheckedRoundRobinProxySelector(t *testing.T) {
+	t.Parallel()
+
+	selector, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{},
+		"http://127.0.0.1:7897",
+		"http://127.0.0.1:7898",
+	)
+	if err != nil {
+		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
+	}
+	if selector == nil {
+		t.Fatal("expected selector")
+	}
+
+	first, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("first Next returned error: %v", err)
+	}
+	second, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("second Next returned error: %v", err)
+	}
+
+	if got := first.String(); got != "http://127.0.0.1:7897" {
+		t.Fatalf("unexpected first proxy: %s", got)
+	}
+	if got := second.String(); got != "http://127.0.0.1:7898" {
+		t.Fatalf("unexpected second proxy: %s", got)
+	}
+}
+
+func TestNewHealthCheckedRoundRobinProxySelectorEmptyReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	selector, err := steam.NewHealthCheckedRoundRobinProxySelector(steam.ProxyHealthConfig{}, "  ")
+	if err != nil {
+		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
+	}
+	if selector != nil {
+		t.Fatal("expected nil selector")
+	}
+}
+
+func TestNewHealthCheckedRoundRobinProxySelectorRejectsInvalidURL(t *testing.T) {
+	t.Parallel()
+
+	if _, err := steam.NewHealthCheckedRoundRobinProxySelector(steam.ProxyHealthConfig{}, "://bad"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestNewHealthCheckedRoundRobinProxySelectorRejectsNegativeConfig(t *testing.T) {
+	t.Parallel()
+
+	if _, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{FailureThreshold: -1},
+		"http://127.0.0.1:7897",
+	); err == nil {
+		t.Fatal("expected error for negative failure threshold")
+	}
+	if _, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{Cooldown: -time.Second},
+		"http://127.0.0.1:7897",
+	); err == nil {
+		t.Fatal("expected error for negative cooldown")
+	}
+}
+
 func TestWithProxySessionKeyStoresTrimmedKey(t *testing.T) {
 	t.Parallel()
 
@@ -384,6 +465,188 @@ func TestStickyProxySelectorConcurrentSameSessionKey(t *testing.T) {
 	}
 	if base.calls.Load() != 1 {
 		t.Fatalf("expected one base call, got %d", base.calls.Load())
+	}
+}
+
+func TestHealthCheckedRoundRobinProxySelectorCoolsDownFailedProxy(t *testing.T) {
+	t.Parallel()
+
+	selector, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{
+			FailureThreshold: 1,
+			Cooldown:         50 * time.Millisecond,
+		},
+		"http://127.0.0.1:7897",
+		"http://127.0.0.1:7898",
+	)
+	if err != nil {
+		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
+	}
+
+	reporter := selector.(interface {
+		ReportProxyResult(req *http.Request, proxyURL *url.URL, statusCode int, err error)
+	})
+
+	first, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("first Next returned error: %v", err)
+	}
+	reporter.ReportProxyResult(nil, first, http.StatusTooManyRequests, nil)
+
+	second, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("second Next returned error: %v", err)
+	}
+	if got := second.String(); got != "http://127.0.0.1:7898" {
+		t.Fatalf("unexpected healthy proxy: %s", got)
+	}
+
+	time.Sleep(60 * time.Millisecond)
+
+	third, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("third Next returned error: %v", err)
+	}
+	if got := third.String(); got != "http://127.0.0.1:7897" {
+		t.Fatalf("expected cooled proxy to recover, got %s", got)
+	}
+}
+
+func TestHealthCheckedRoundRobinProxySelectorReturnsErrorWhenAllCoolingDown(t *testing.T) {
+	t.Parallel()
+
+	selector, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{
+			FailureThreshold: 1,
+			Cooldown:         time.Second,
+		},
+		"http://127.0.0.1:7897",
+		"http://127.0.0.1:7898",
+	)
+	if err != nil {
+		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
+	}
+
+	reporter := selector.(interface {
+		ReportProxyResult(req *http.Request, proxyURL *url.URL, statusCode int, err error)
+	})
+
+	first, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("first Next returned error: %v", err)
+	}
+	reporter.ReportProxyResult(nil, first, http.StatusInternalServerError, nil)
+
+	second, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("second Next returned error: %v", err)
+	}
+	reporter.ReportProxyResult(nil, second, http.StatusTooManyRequests, nil)
+
+	if _, err := selector.Next(&http.Request{}); !errors.Is(err, steam.ErrAllProxiesCoolingDown) {
+		t.Fatalf("expected ErrAllProxiesCoolingDown, got %v", err)
+	}
+}
+
+func TestHealthCheckedRoundRobinProxySelectorResetsFailureScoreOnSuccess(t *testing.T) {
+	t.Parallel()
+
+	selector, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{
+			FailureThreshold: 2,
+			Cooldown:         time.Second,
+		},
+		"http://127.0.0.1:7897",
+	)
+	if err != nil {
+		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
+	}
+
+	reporter := selector.(interface {
+		ReportProxyResult(req *http.Request, proxyURL *url.URL, statusCode int, err error)
+	})
+
+	proxyURL, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("selector.Next returned error: %v", err)
+	}
+	reporter.ReportProxyResult(nil, proxyURL, http.StatusInternalServerError, nil)
+	reporter.ReportProxyResult(nil, proxyURL, http.StatusOK, nil)
+	reporter.ReportProxyResult(nil, proxyURL, http.StatusInternalServerError, nil)
+
+	next, err := selector.Next(&http.Request{})
+	if err != nil {
+		t.Fatalf("selector.Next returned error: %v", err)
+	}
+	if next == nil {
+		t.Fatal("expected proxy to remain available after score reset")
+	}
+}
+
+func TestStickyProxySelectorRebindsWhenHealthCheckedProxyCoolsDown(t *testing.T) {
+	t.Parallel()
+
+	base, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{
+			FailureThreshold: 1,
+			Cooldown:         time.Second,
+		},
+		"http://127.0.0.1:7897",
+		"http://127.0.0.1:7898",
+	)
+	if err != nil {
+		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
+	}
+	selector := steam.NewStickyProxySelector(base)
+
+	reporter := selector.(interface {
+		ReportProxyResult(req *http.Request, proxyURL *url.URL, statusCode int, err error)
+	})
+	req := mustRequestWithContext(t, steam.WithProxySessionKey(context.Background(), "session-a"), "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/")
+
+	first, err := selector.Next(req)
+	if err != nil {
+		t.Fatalf("selector.Next returned error: %v", err)
+	}
+	reporter.ReportProxyResult(req, first, http.StatusTooManyRequests, nil)
+
+	second, err := selector.Next(req)
+	if err != nil {
+		t.Fatalf("selector.Next returned error: %v", err)
+	}
+	if got := second.String(); got != "http://127.0.0.1:7898" {
+		t.Fatalf("expected sticky selector to rebind, got %s", got)
+	}
+}
+
+func TestStickyProxySelectorReturnsCoolingErrorWhenPoolUnavailable(t *testing.T) {
+	t.Parallel()
+
+	base, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.ProxyHealthConfig{
+			FailureThreshold: 1,
+			Cooldown:         time.Second,
+		},
+		"http://127.0.0.1:7897",
+	)
+	if err != nil {
+		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
+	}
+	selector := steam.NewStickyProxySelector(base)
+
+	reporter := selector.(interface {
+		ReportProxyResult(req *http.Request, proxyURL *url.URL, statusCode int, err error)
+	})
+	req := mustRequestWithContext(t, steam.WithProxySessionKey(context.Background(), "session-a"), "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/")
+
+	first, err := selector.Next(req)
+	if err != nil {
+		t.Fatalf("selector.Next returned error: %v", err)
+	}
+	reporter.ReportProxyResult(req, first, http.StatusInternalServerError, nil)
+
+	if _, err := selector.Next(req); !errors.Is(err, steam.ErrAllProxiesCoolingDown) {
+		t.Fatalf("expected ErrAllProxiesCoolingDown, got %v", err)
 	}
 }
 

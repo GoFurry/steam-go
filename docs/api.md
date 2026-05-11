@@ -202,15 +202,21 @@ Notes:
 
 ## Proxy Helpers
 
+- `ProxyHealthConfig`
+- `DefaultProxyHealthConfig()`
+- `ErrAllProxiesCoolingDown`
 - `WithProxySelector(selector ProxySelector)`
 - `WithProxySessionKey(ctx context.Context, key string) context.Context`
 - `NewStaticProxySelector(rawURL string)`
 - `NewRoundRobinProxySelector(rawURLs ...string)`
+- `NewHealthCheckedRoundRobinProxySelector(cfg ProxyHealthConfig, rawURLs ...string)`
 - `NewStickyProxySelector(base ProxySelector)`
 - `NewRoutingProxySelector(routes ...ProxyRoute)`
 - `NewHTTPClientWithProxySelector(selector ProxySelector, timeout time.Duration)`
 
 Notes:
+- `NewHealthCheckedRoundRobinProxySelector(...)` only targets explicit proxy pools in the first version.
+- `ErrAllProxiesCoolingDown` means every proxy in that health-checked pool is still inside its cooldown window.
 - `WithProxySessionKey(...)` only affects selectors that explicitly support sticky session lookup.
 - `NewStickyProxySelector(...)` is designed as a wrapper and can be composed with static, round-robin, or routing selectors.
 

@@ -15,6 +15,10 @@ type ProxySelector interface {
 	Next(req *http.Request) (*url.URL, error)
 }
 
+type proxyResultReporter interface {
+	ReportProxyResult(req *http.Request, proxyURL *url.URL, statusCode int, err error)
+}
+
 // RateLimiterConfig defines one token-bucket limiter.
 type RateLimiterConfig struct {
 	Limit rate.Limit
@@ -63,9 +67,12 @@ func WrapRoundTripper(rt http.RoundTripper, selector ProxySelector) (http.RoundT
 		return nil, err
 	}
 	base.Proxy = func(req *http.Request) (*url.URL, error) {
-		return selector.Next(req)
+		return selectedProxyFromContext(req.Context()), nil
 	}
-	return base, nil
+	return proxySelectionRoundTripper{
+		base:     base,
+		selector: selector,
+	}, nil
 }
 
 func baseTransport(rt http.RoundTripper) (*http.Transport, error) {
@@ -89,4 +96,45 @@ func defaultTransport() *http.Transport {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
+}
+
+type selectedProxyContextKey struct{}
+
+type proxySelectionRoundTripper struct {
+	base     http.RoundTripper
+	selector ProxySelector
+}
+
+func (rt proxySelectionRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	selectedProxy, err := rt.selector.Next(req)
+	if err != nil {
+		return nil, err
+	}
+
+	reqWithProxy := req.Clone(context.WithValue(req.Context(), selectedProxyContextKey{}, cloneURL(selectedProxy)))
+	resp, roundTripErr := rt.base.RoundTrip(reqWithProxy)
+	if reporter, ok := rt.selector.(proxyResultReporter); ok {
+		statusCode := 0
+		if resp != nil {
+			statusCode = resp.StatusCode
+		}
+		reporter.ReportProxyResult(req, cloneURL(selectedProxy), statusCode, roundTripErr)
+	}
+	return resp, roundTripErr
+}
+
+func selectedProxyFromContext(ctx context.Context) *url.URL {
+	if ctx == nil {
+		return nil
+	}
+	proxyURL, _ := ctx.Value(selectedProxyContextKey{}).(*url.URL)
+	return cloneURL(proxyURL)
+}
+
+func cloneURL(proxyURL *url.URL) *url.URL {
+	if proxyURL == nil {
+		return nil
+	}
+	cloned := *proxyURL
+	return &cloned
 }

@@ -22,6 +22,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	healthSelector, err := steam.NewHealthCheckedRoundRobinProxySelector(
+		steam.DefaultProxyHealthConfig(),
+		"http://127.0.0.1:7897",
+		"http://127.0.0.1:7898",
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	routingSelector, err := steam.NewRoutingProxySelector(
 		steam.ProxyRoute{
 			Host:       "api.steampowered.com",
@@ -50,6 +59,10 @@ func main() {
 	fmt.Println("\n== round-robin selector ==")
 	printSelections(roundRobinSelector, requests[:2])
 	printSelections(roundRobinSelector, requests[:2])
+
+	fmt.Println("\n== health-checked round-robin selector ==")
+	printSelections(healthSelector, requests[:2])
+	printSelections(healthSelector, requests[:2])
 
 	fmt.Println("\n== routing selector ==")
 	printSelections(routingSelector, requests)

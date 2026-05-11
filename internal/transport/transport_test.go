@@ -124,6 +124,116 @@ func TestWrapRoundTripperRejectsCustomRoundTripperWithProxySelector(t *testing.T
 	}
 }
 
+func TestWrapRoundTripperCallsSelectorOncePerRequest(t *testing.T) {
+	t.Parallel()
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`ok`))
+	}))
+	defer target.Close()
+
+	selector := &reportingProxySelector{}
+	base := target.Client().Transport.(*http.Transport)
+	rt, err := WrapRoundTripper(base, selector)
+	if err != nil {
+		t.Fatalf("WrapRoundTripper returned error: %v", err)
+	}
+
+	client := &http.Client{Transport: rt}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, target.URL, nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext returned error: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("client.Do returned error: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	if selector.calls.Load() != 1 {
+		t.Fatalf("expected one selector.Next call, got %d", selector.calls.Load())
+	}
+	if selector.reportCalls.Load() != 1 {
+		t.Fatalf("expected one report call, got %d", selector.reportCalls.Load())
+	}
+	if got := selector.lastStatus.Load(); got != http.StatusOK {
+		t.Fatalf("unexpected reported status: %d", got)
+	}
+}
+
+func TestWrapRoundTripperReportsTransportErrors(t *testing.T) {
+	t.Parallel()
+
+	selector := &reportingProxySelector{}
+	base := &http.Transport{
+		DialContext: func(context.Context, string, string) (net.Conn, error) {
+			return nil, errors.New("dial failed")
+		},
+	}
+	rt, err := WrapRoundTripper(base, selector)
+	if err != nil {
+		t.Fatalf("WrapRoundTripper returned error: %v", err)
+	}
+
+	client := &http.Client{Transport: rt}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext returned error: %v", err)
+	}
+
+	if _, err := client.Do(req); err == nil {
+		t.Fatal("expected transport error")
+	}
+	if selector.calls.Load() != 1 {
+		t.Fatalf("expected one selector.Next call, got %d", selector.calls.Load())
+	}
+	if selector.reportCalls.Load() != 1 {
+		t.Fatalf("expected one report call, got %d", selector.reportCalls.Load())
+	}
+	if !selector.sawErr.Load() {
+		t.Fatal("expected transport error to be reported")
+	}
+}
+
+func TestWrapRoundTripperReportsHTTPStatusCodes(t *testing.T) {
+	t.Parallel()
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "rate limited", http.StatusTooManyRequests)
+	}))
+	defer target.Close()
+
+	selector := &reportingProxySelector{}
+	base := target.Client().Transport.(*http.Transport)
+	rt, err := WrapRoundTripper(base, selector)
+	if err != nil {
+		t.Fatalf("WrapRoundTripper returned error: %v", err)
+	}
+
+	client := &http.Client{Transport: rt}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, target.URL, nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext returned error: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("client.Do returned error: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	if selector.reportCalls.Load() != 1 {
+		t.Fatalf("expected one report call, got %d", selector.reportCalls.Load())
+	}
+	if got := selector.lastStatus.Load(); got != http.StatusTooManyRequests {
+		t.Fatalf("unexpected reported status: %d", got)
+	}
+	if selector.sawErr.Load() {
+		t.Fatal("did not expect transport error for HTTP response")
+	}
+}
+
 func proxyCopy(dst net.Conn, src net.Conn) {
 	_, _ = io.Copy(dst, src)
 	_ = dst.Close()
@@ -136,6 +246,29 @@ type staticProxySelector struct {
 
 func (s staticProxySelector) Next(*http.Request) (*url.URL, error) {
 	return s.url, nil
+}
+
+type reportingProxySelector struct {
+	proxyURL    *url.URL
+	calls       atomic.Int32
+	reportCalls atomic.Int32
+	lastStatus  atomic.Int32
+	sawErr      atomic.Bool
+}
+
+func (s *reportingProxySelector) Next(*http.Request) (*url.URL, error) {
+	s.calls.Add(1)
+	if s.proxyURL == nil {
+		return nil, nil
+	}
+	cloned := *s.proxyURL
+	return &cloned, nil
+}
+
+func (s *reportingProxySelector) ReportProxyResult(_ *http.Request, _ *url.URL, statusCode int, err error) {
+	s.reportCalls.Add(1)
+	s.lastStatus.Store(int32(statusCode))
+	s.sawErr.Store(err != nil)
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
