@@ -197,6 +197,35 @@ metrics := selector.(steam.ProxyMetricsProvider).ProxyMetricsSnapshot()
 fmt.Printf("healthy=%d cooling=%d\n", metrics.HealthyProxies, metrics.CoolingProxies)
 ```
 
+## Traffic Classes
+
+`steam-go` now supports per-class request policy routing so official Steam Web API traffic and future public store-page traffic can use different request strategies.
+
+- `TrafficClassOfficialAPI` is the default for existing typed `client.API.*` methods
+- `TrafficClassPublicStorePage` is reserved for future public store-page integrations
+- `WithTrafficPolicy(...)` overrides proxy, cookie jar, retry, and rate limit per class
+- `WithTrafficClass(ctx, class)` lets one request opt into a non-default class
+
+Example:
+
+```go
+client, err := steam.NewClient(
+	steam.WithAPIKey("your-key"),
+	steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+		RateLimiter: &steam.TrafficRateLimiterPolicy{
+			Limit: 10,
+			Burst: 10,
+		},
+	}),
+)
+if err != nil {
+	panic(err)
+}
+
+ctx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
+_, _ = client.API.SteamUser.GetPlayerSummaries(ctx, []string{"76561198370695025"})
+```
+
 On China-region networks, browser login may succeed while the server-side Steam OpenID `check_authentication` request still times out. The OpenID example supports `--proxy http://127.0.0.1:7897` for that case and also demonstrates cookie-backed `state` verification on the callback.
 
 ## Examples

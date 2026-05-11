@@ -119,6 +119,35 @@ if err != nil {
 }
 ```
 
+## 流量类别
+
+`steam-go` 现在支持按流量类别路由请求策略，让官方 Steam Web API 流量和后续公开商店页流量可以使用不同的请求配置。
+
+- `TrafficClassOfficialAPI`：现有 typed `client.API.*` 方法的默认类别
+- `TrafficClassPublicStorePage`：为后续公开商店页接入预留的类别
+- `WithTrafficPolicy(...)`：按类别覆盖 proxy、cookie jar、retry 和 rate limit
+- `WithTrafficClass(ctx, class)`：让单次请求显式切到非默认类别
+
+示例：
+
+```go
+client, err := steam.NewClient(
+	steam.WithAPIKey("your-key"),
+	steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+		RateLimiter: &steam.TrafficRateLimiterPolicy{
+			Limit: 10,
+			Burst: 10,
+		},
+	}),
+)
+if err != nil {
+	panic(err)
+}
+
+ctx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
+_, _ = client.API.SteamUser.GetPlayerSummaries(ctx, []string{"76561198370695025"})
+```
+
 粘性代理示例：
 
 ```go

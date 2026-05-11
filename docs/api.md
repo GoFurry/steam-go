@@ -224,6 +224,24 @@ Notes:
 - `WithProxySessionKey(...)` only affects selectors that explicitly support sticky session lookup.
 - `NewStickyProxySelector(...)` is designed as a wrapper and can be composed with static, round-robin, or routing selectors.
 
+## Traffic Policy Helpers
+
+- `TrafficClass`
+- `TrafficClassOfficialAPI`
+- `TrafficClassPublicStorePage`
+- `RetryBackoffConfig`
+- `DefaultRetryBackoffConfig()`
+- `TrafficPolicy`
+- `TrafficRateLimiterPolicy`
+- `TrafficRetryPolicy`
+- `WithTrafficPolicy(class TrafficClass, policy TrafficPolicy)`
+- `WithTrafficClass(ctx context.Context, class TrafficClass) context.Context`
+
+Notes:
+- Existing typed `client.API.*` methods default to `TrafficClassOfficialAPI`.
+- `TrafficClassPublicStorePage` is reserved for future public store-page integrations and can already carry isolated request policy overrides.
+- `WithTrafficPolicy(...)` only overrides the fields you set; unset fields continue to use the client-level defaults.
+
 ## Examples
 
 - `go run ./examples/a2s -server 1.2.3.4:27015 -query info`

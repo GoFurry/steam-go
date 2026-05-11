@@ -43,6 +43,7 @@ type clientConfig struct {
 	cookieJarConfigured  bool
 	maxResponseBodyBytes int64
 	proxySelector        ProxySelector
+	trafficPolicies      map[TrafficClass]trafficPolicyConfig
 }
 
 func defaultClientConfig() clientConfig {

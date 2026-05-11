@@ -214,3 +214,47 @@ func TestLastCookieJarOptionWins(t *testing.T) {
 		t.Fatalf("expected nil cookie jar to override prior config, got %#v", cfg.cookieJar)
 	}
 }
+
+func TestWithTrafficPolicyStoresPerClassPolicy(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultClientConfig()
+	jar := stubCookieJar{}
+	backoff := DefaultRetryBackoffConfig()
+	if err := WithTrafficPolicy(TrafficClassPublicStorePage, TrafficPolicy{
+		CookieJar: jar,
+		RateLimiter: &TrafficRateLimiterPolicy{
+			Limit: rate.Limit(4),
+			Burst: 6,
+		},
+		Retry: &TrafficRetryPolicy{
+			Retry:   2,
+			Backoff: backoff,
+		},
+	})(&cfg); err != nil {
+		t.Fatalf("WithTrafficPolicy returned error: %v", err)
+	}
+
+	policy, ok := cfg.trafficPolicies[TrafficClassPublicStorePage]
+	if !ok {
+		t.Fatal("expected per-class policy to be stored")
+	}
+	if !policy.cookieJarProvided || policy.cookieJar != jar {
+		t.Fatalf("unexpected cookie jar policy: %#v", policy)
+	}
+	if policy.rateLimiter == nil || policy.rateLimiter.Limit != rate.Limit(4) || policy.rateLimiter.Burst != 6 {
+		t.Fatalf("unexpected rate limiter policy: %#v", policy.rateLimiter)
+	}
+	if policy.retry == nil || policy.retry.Retry != 2 || policy.retry.Backoff != backoff {
+		t.Fatalf("unexpected retry policy: %#v", policy.retry)
+	}
+}
+
+func TestWithTrafficPolicyRejectsUnsupportedClass(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultClientConfig()
+	if err := WithTrafficPolicy(TrafficClass("unknown"), TrafficPolicy{})(&cfg); err == nil {
+		t.Fatal("expected error for unsupported traffic class")
+	}
+}

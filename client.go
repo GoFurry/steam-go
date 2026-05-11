@@ -32,6 +32,7 @@ import (
 	"github.com/GoFurry/steam-go/api/userstorevisitservice"
 	"github.com/GoFurry/steam-go/api/wishlistservice"
 	"github.com/GoFurry/steam-go/internal/request"
+	itraffic "github.com/GoFurry/steam-go/internal/traffic"
 	"github.com/GoFurry/steam-go/internal/transport"
 )
 
@@ -39,7 +40,7 @@ import (
 type Client struct {
 	API *API
 
-	httpClient *http.Client
+	httpClients []*http.Client
 }
 
 // API groups all typed Steam Web API services under one stable entrypoint.
@@ -83,26 +84,24 @@ func NewClient(opts ...Option) (*Client, error) {
 		}
 	}
 
-	httpClient, err := buildHTTPClient(cfg)
+	runtimes, err := buildTrafficRuntimes(cfg)
 	if err != nil {
 		return nil, err
 	}
-	rt := transport.New(httpClient, cfg.rateLimiter)
 	executor, err := request.NewExecutor(
 		cfg.baseURL,
 		cfg.apiKeyProvider,
 		cfg.accessTokenProvider,
-		cfg.retry,
-		cfg.retryBackoff,
 		cfg.maxResponseBodyBytes,
-		rt,
+		runtimes.defaultPolicy,
+		runtimes.classPolicies,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	client := &Client{
-		httpClient: httpClient,
+		httpClients: runtimes.httpClients,
 	}
 	client.API = &API{
 		AccountCartService:        accountcartservice.NewService(executor),
@@ -139,20 +138,116 @@ func NewClient(opts ...Option) (*Client, error) {
 
 // Close releases idle HTTP connections held by the SDK client.
 func (c *Client) Close() {
-	if c == nil || c.httpClient == nil {
+	if c == nil {
 		return
 	}
-	c.httpClient.CloseIdleConnections()
+	for _, httpClient := range c.httpClients {
+		if httpClient == nil {
+			continue
+		}
+		httpClient.CloseIdleConnections()
+	}
 }
 
-func buildHTTPClient(cfg clientConfig) (*http.Client, error) {
+type trafficRuntimeSet struct {
+	defaultPolicy request.ExecutionPolicy
+	classPolicies map[itraffic.Class]request.ExecutionPolicy
+	httpClients   []*http.Client
+}
+
+type runtimePolicyConfig struct {
+	proxySelector ProxySelector
+	cookieJar     http.CookieJar
+	rateLimiter   transport.RateLimiterConfig
+	retry         int
+	retryBackoff  request.RetryBackoffConfig
+}
+
+func buildTrafficRuntimes(cfg clientConfig) (trafficRuntimeSet, error) {
+	defaultRuntime, err := buildRuntime(cfg, runtimePolicyConfig{
+		proxySelector: cfg.proxySelector,
+		cookieJar:     cfg.cookieJar,
+		rateLimiter:   cfg.rateLimiter,
+		retry:         cfg.retry,
+		retryBackoff:  cfg.retryBackoff,
+	}, cfg.cookieJarConfigured)
+	if err != nil {
+		return trafficRuntimeSet{}, err
+	}
+
+	runtimes := trafficRuntimeSet{
+		defaultPolicy: defaultRuntime.executionPolicy,
+		classPolicies: make(map[itraffic.Class]request.ExecutionPolicy, len(cfg.trafficPolicies)),
+		httpClients:   []*http.Client{defaultRuntime.httpClient},
+	}
+
+	for class, policy := range cfg.trafficPolicies {
+		resolved := runtimePolicyConfig{
+			proxySelector: cfg.proxySelector,
+			cookieJar:     cfg.cookieJar,
+			rateLimiter:   cfg.rateLimiter,
+			retry:         cfg.retry,
+			retryBackoff:  cfg.retryBackoff,
+		}
+		cookieJarConfigured := cfg.cookieJarConfigured
+		if policy.proxySelector != nil {
+			resolved.proxySelector = policy.proxySelector
+		}
+		if policy.cookieJarProvided {
+			resolved.cookieJar = policy.cookieJar
+			cookieJarConfigured = true
+		}
+		if policy.rateLimiter != nil {
+			resolved.rateLimiter = transport.RateLimiterConfig{
+				Limit: policy.rateLimiter.Limit,
+				Burst: policy.rateLimiter.Burst,
+			}
+		}
+		if policy.retry != nil {
+			resolved.retry = policy.retry.Retry
+			resolved.retryBackoff = request.RetryBackoffConfig(policy.retry.Backoff)
+		}
+
+		runtime, err := buildRuntime(cfg, resolved, cookieJarConfigured)
+		if err != nil {
+			return trafficRuntimeSet{}, err
+		}
+		class = itraffic.NormalizeClass(class)
+		runtimes.classPolicies[class] = runtime.executionPolicy
+		runtimes.httpClients = append(runtimes.httpClients, runtime.httpClient)
+	}
+
+	return runtimes, nil
+}
+
+type builtRuntime struct {
+	httpClient      *http.Client
+	executionPolicy request.ExecutionPolicy
+}
+
+func buildRuntime(cfg clientConfig, policy runtimePolicyConfig, cookieJarConfigured bool) (builtRuntime, error) {
+	httpClient, err := buildHTTPClient(cfg, policy.proxySelector, policy.cookieJar, cookieJarConfigured)
+	if err != nil {
+		return builtRuntime{}, err
+	}
+	return builtRuntime{
+		httpClient: httpClient,
+		executionPolicy: request.ExecutionPolicy{
+			Retry:        policy.retry,
+			RetryBackoff: policy.retryBackoff,
+			Transport:    transport.New(httpClient, policy.rateLimiter),
+		},
+	}, nil
+}
+
+func buildHTTPClient(cfg clientConfig, selector ProxySelector, jar http.CookieJar, cookieJarConfigured bool) (*http.Client, error) {
 	if cfg.httpClient != nil {
 		cloned := *cfg.httpClient
 		cloned.Timeout = cfg.timeout
-		if cfg.cookieJarConfigured {
-			cloned.Jar = cfg.cookieJar
+		if cookieJarConfigured {
+			cloned.Jar = jar
 		}
-		rt, err := transport.WrapRoundTripper(cloned.Transport, cfg.proxySelector)
+		rt, err := transport.WrapRoundTripper(cloned.Transport, selector)
 		if err != nil {
 			return nil, err
 		}
@@ -160,13 +255,13 @@ func buildHTTPClient(cfg clientConfig) (*http.Client, error) {
 		return &cloned, nil
 	}
 
-	rt, err := transport.WrapRoundTripper(nil, cfg.proxySelector)
+	rt, err := transport.WrapRoundTripper(nil, selector)
 	if err != nil {
 		return nil, err
 	}
 	return &http.Client{
 		Timeout:   cfg.timeout,
 		Transport: rt,
-		Jar:       cfg.cookieJar,
+		Jar:       jar,
 	}, nil
 }

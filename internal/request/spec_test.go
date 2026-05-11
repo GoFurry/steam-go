@@ -13,6 +13,7 @@ import (
 	"github.com/GoFurry/steam-go/internal/auth"
 	sdkerrors "github.com/GoFurry/steam-go/internal/errors"
 	"github.com/GoFurry/steam-go/internal/request"
+	"github.com/GoFurry/steam-go/internal/traffic"
 )
 
 func TestExecutorSupportsRequestBody(t *testing.T) {
@@ -26,10 +27,13 @@ func TestExecutorSupportsRequestBody(t *testing.T) {
 		"https://api.steampowered.com",
 		nil,
 		nil,
-		0,
-		request.DefaultRetryBackoffConfig(),
 		1024,
-		recorder,
+		request.ExecutionPolicy{
+			Retry:        0,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    recorder,
+		},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
@@ -84,10 +88,13 @@ func TestExecutorReusesRequestBodyAcrossRetries(t *testing.T) {
 		"https://api.steampowered.com",
 		auth.NewStaticKeyProvider("demo-key"),
 		auth.NewStaticAccessTokenProvider("demo-token"),
-		1,
-		request.DefaultRetryBackoffConfig(),
 		1024,
-		recorder,
+		request.ExecutionPolicy{
+			Retry:        1,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    recorder,
+		},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
@@ -133,10 +140,13 @@ func TestExecutorRotatesAccessTokenOnUnauthorizedRetry(t *testing.T) {
 		"https://api.steampowered.com",
 		nil,
 		auth.NewRoundRobinAccessTokenProvider("token-a", "token-b"),
-		1,
-		request.DefaultRetryBackoffConfig(),
 		1024,
-		recorder,
+		request.ExecutionPolicy{
+			Retry:        1,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    recorder,
+		},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
@@ -174,10 +184,13 @@ func TestExecutorPreservesExplicitContentTypeHeader(t *testing.T) {
 		"https://api.steampowered.com",
 		nil,
 		nil,
-		0,
-		request.DefaultRetryBackoffConfig(),
 		1024,
-		recorder,
+		request.ExecutionPolicy{
+			Retry:        0,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    recorder,
+		},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
@@ -212,10 +225,13 @@ func TestExecutorPreservesExplicitCredentialsFromQuery(t *testing.T) {
 		"https://api.steampowered.com",
 		auth.NewStaticKeyProvider("global-key"),
 		auth.NewStaticAccessTokenProvider("global-token"),
-		0,
-		request.DefaultRetryBackoffConfig(),
 		1024,
-		recorder,
+		request.ExecutionPolicy{
+			Retry:        0,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    recorder,
+		},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
@@ -328,10 +344,13 @@ func TestExecutorRejectsResponsesThatExceedBodyLimit(t *testing.T) {
 		"https://api.steampowered.com",
 		nil,
 		nil,
-		0,
-		request.DefaultRetryBackoffConfig(),
 		8,
-		recorder,
+		request.ExecutionPolicy{
+			Retry:        0,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    recorder,
+		},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
@@ -350,7 +369,18 @@ func TestExecutorRejectsResponsesThatExceedBodyLimit(t *testing.T) {
 func TestExecutorReportsRequestBuildErrorForInvalidMethod(t *testing.T) {
 	t.Parallel()
 
-	executor, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, request.DefaultRetryBackoffConfig(), 1024, &recordingTransport{})
+	executor, err := request.NewExecutor(
+		"https://api.steampowered.com",
+		nil,
+		nil,
+		1024,
+		request.ExecutionPolicy{
+			Retry:        0,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    &recordingTransport{},
+		},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
@@ -365,9 +395,82 @@ func TestExecutorReportsRequestBuildErrorForInvalidMethod(t *testing.T) {
 func TestExecutorRejectsInvalidBodyLimit(t *testing.T) {
 	t.Parallel()
 
-	_, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, request.DefaultRetryBackoffConfig(), 0, &recordingTransport{})
+	_, err := request.NewExecutor(
+		"https://api.steampowered.com",
+		nil,
+		nil,
+		0,
+		request.ExecutionPolicy{
+			Retry:        0,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    &recordingTransport{},
+		},
+		nil,
+	)
 	var apiErr *sdkerrors.APIError
 	if err == nil || !errors.As(err, &apiErr) || apiErr.Kind != sdkerrors.KindRequestBuild {
 		t.Fatalf("expected request_build error, got %v", err)
+	}
+}
+
+func TestExecutorRoutesTrafficClassPolicies(t *testing.T) {
+	t.Parallel()
+
+	officialTransport := &recordingTransport{
+		statuses: []int{http.StatusOK},
+	}
+	storeTransport := &recordingTransport{
+		statuses: []int{http.StatusOK},
+	}
+
+	executor, err := request.NewExecutor(
+		"https://api.steampowered.com",
+		nil,
+		nil,
+		1024,
+		request.ExecutionPolicy{
+			Retry:        0,
+			RetryBackoff: request.DefaultRetryBackoffConfig(),
+			Transport:    officialTransport,
+		},
+		map[traffic.Class]request.ExecutionPolicy{
+			traffic.ClassPublicStorePage: {
+				Retry:        0,
+				RetryBackoff: request.DefaultRetryBackoffConfig(),
+				Transport:    storeTransport,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewExecutor returned error: %v", err)
+	}
+
+	if _, err := executor.DoRaw(context.Background(), request.RequestSpec{
+		Method: http.MethodGet,
+		Path:   "/ITestService/Official/v1/",
+	}); err != nil {
+		t.Fatalf("official request returned error: %v", err)
+	}
+
+	storeCtx := traffic.WithClass(context.Background(), traffic.ClassPublicStorePage)
+	if _, err := executor.DoRaw(storeCtx, request.RequestSpec{
+		Method: http.MethodGet,
+		Path:   "/ITestService/Store/v1/",
+	}); err != nil {
+		t.Fatalf("store request returned error: %v", err)
+	}
+
+	officialTransport.mu.Lock()
+	officialCount := len(officialTransport.requests)
+	officialTransport.mu.Unlock()
+	storeTransport.mu.Lock()
+	storeCount := len(storeTransport.requests)
+	storeTransport.mu.Unlock()
+
+	if officialCount != 1 {
+		t.Fatalf("expected one official request, got %d", officialCount)
+	}
+	if storeCount != 1 {
+		t.Fatalf("expected one store request, got %d", storeCount)
 	}
 }

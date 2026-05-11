@@ -15,6 +15,7 @@ import (
 
 	"github.com/GoFurry/steam-go/internal/auth"
 	sdkerrors "github.com/GoFurry/steam-go/internal/errors"
+	"github.com/GoFurry/steam-go/internal/traffic"
 )
 
 const defaultUserAgent = "steam-go/1"
@@ -26,12 +27,13 @@ type Transport interface {
 
 // RequestSpec describes a Steam API request.
 type RequestSpec struct {
-	Method      string
-	Path        string
-	Query       url.Values
-	Headers     http.Header
-	Body        []byte
-	ContentType string
+	Method       string
+	Path         string
+	Query        url.Values
+	Headers      http.Header
+	Body         []byte
+	ContentType  string
+	TrafficClass traffic.Class
 }
 
 // Executor performs request assembly and response reading.
@@ -39,10 +41,9 @@ type Executor struct {
 	baseURL              *url.URL
 	apiKeyProvider       auth.APIKeyProvider
 	accessTokenProvider  auth.AccessTokenProvider
-	retry                int
-	retryBackoff         RetryBackoffConfig
 	maxResponseBodyBytes int64
-	transport            Transport
+	defaultPolicy        ExecutionPolicy
+	classPolicies        map[traffic.Class]ExecutionPolicy
 }
 
 type requestCredentials struct {
@@ -57,6 +58,13 @@ type RetryBackoffConfig struct {
 	RespectRetryAfter bool
 }
 
+// ExecutionPolicy routes one request to one transport and retry profile.
+type ExecutionPolicy struct {
+	Retry        int
+	RetryBackoff RetryBackoffConfig
+	Transport    Transport
+}
+
 // DefaultRetryBackoffConfig returns the SDK retry defaults.
 func DefaultRetryBackoffConfig() RetryBackoffConfig {
 	return RetryBackoffConfig{
@@ -67,31 +75,32 @@ func DefaultRetryBackoffConfig() RetryBackoffConfig {
 }
 
 // NewExecutor creates a request executor.
-func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, retryBackoff RetryBackoffConfig, maxResponseBodyBytes int64, transport Transport) (*Executor, error) {
+func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, maxResponseBodyBytes int64, defaultPolicy ExecutionPolicy, classPolicies map[traffic.Class]ExecutionPolicy) (*Executor, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "invalid base url", nil, err)
 	}
-	if retryBackoff.BaseDelay <= 0 {
-		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "retry base delay must be greater than zero", nil, nil)
-	}
-	if retryBackoff.MaxDelay <= 0 {
-		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "retry max delay must be greater than zero", nil, nil)
-	}
-	if retryBackoff.MaxDelay < retryBackoff.BaseDelay {
-		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "retry max delay must be greater than or equal to base delay", nil, nil)
-	}
 	if maxResponseBodyBytes <= 0 {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "max response body bytes must be greater than zero", nil, nil)
+	}
+	if err := validateExecutionPolicy(defaultPolicy); err != nil {
+		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, err.Error(), nil, nil)
+	}
+	resolvedClassPolicies := make(map[traffic.Class]ExecutionPolicy, len(classPolicies))
+	for class, policy := range classPolicies {
+		class = traffic.NormalizeClass(class)
+		if err := validateExecutionPolicy(policy); err != nil {
+			return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, err.Error(), nil, nil)
+		}
+		resolvedClassPolicies[class] = policy
 	}
 	return &Executor{
 		baseURL:              parsed,
 		apiKeyProvider:       apiKeyProvider,
 		accessTokenProvider:  accessTokenProvider,
-		retry:                retry,
-		retryBackoff:         retryBackoff,
 		maxResponseBodyBytes: maxResponseBodyBytes,
-		transport:            transport,
+		defaultPolicy:        defaultPolicy,
+		classPolicies:        resolvedClassPolicies,
 	}, nil
 }
 
@@ -111,19 +120,20 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
+	policy := e.executionPolicy(ctx, spec.TrafficClass)
 
 	var lastErr error
-	for attempt := 0; attempt <= e.retry; attempt++ {
+	for attempt := 0; attempt <= policy.Retry; attempt++ {
 		req, err := e.buildRequest(ctx, resolved, spec, creds)
 		if err != nil {
 			return nil, err
 		}
 
-		resp, err := e.transport.Do(ctx, req)
+		resp, err := policy.Transport.Do(ctx, req)
 		if err != nil {
 			lastErr = sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, err)
-			if shouldRetryTransport(ctx, err) && attempt < e.retry {
-				if !sleepBeforeRetry(ctx, attempt, nil, e.retryBackoff) {
+			if shouldRetryTransport(ctx, err) && attempt < policy.Retry {
+				if !sleepBeforeRetry(ctx, attempt, nil, policy.RetryBackoff) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -134,8 +144,8 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 		body, readErr := readAndCloseBody(resp, e.maxResponseBodyBytes)
 		if readErr != nil {
 			lastErr = sdkerrors.New(sdkerrors.KindTransport, resp.StatusCode, "read response body failed", nil, readErr)
-			if attempt < e.retry {
-				if !sleepBeforeRetry(ctx, attempt, resp, e.retryBackoff) {
+			if attempt < policy.Retry {
+				if !sleepBeforeRetry(ctx, attempt, resp, policy.RetryBackoff) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -151,12 +161,12 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 				body,
 				nil,
 			)
-			if shouldRetryStatus(resp.StatusCode, e.apiKeyProvider != nil, e.accessTokenProvider != nil) && attempt < e.retry {
+			if shouldRetryStatus(resp.StatusCode, e.apiKeyProvider != nil, e.accessTokenProvider != nil) && attempt < policy.Retry {
 				creds, err = e.rotateRetryCredentials(req, resp.StatusCode, creds)
 				if err != nil {
 					return nil, err
 				}
-				if !sleepBeforeRetry(ctx, attempt, resp, e.retryBackoff) {
+				if !sleepBeforeRetry(ctx, attempt, resp, policy.RetryBackoff) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -265,6 +275,36 @@ func (e *Executor) buildRequest(ctx context.Context, resolved *url.URL, spec Req
 	}
 
 	return req, nil
+}
+
+func (e *Executor) executionPolicy(ctx context.Context, specClass traffic.Class) ExecutionPolicy {
+	class := traffic.NormalizeClass(specClass)
+	if ctxClass, ok := traffic.ClassFromContext(ctx); ok {
+		class = ctxClass
+	}
+	if policy, ok := e.classPolicies[class]; ok {
+		return policy
+	}
+	return e.defaultPolicy
+}
+
+func validateExecutionPolicy(policy ExecutionPolicy) error {
+	if policy.Transport == nil {
+		return fmt.Errorf("transport is required")
+	}
+	if policy.Retry < 0 {
+		return fmt.Errorf("retry must not be negative")
+	}
+	if policy.RetryBackoff.BaseDelay <= 0 {
+		return fmt.Errorf("retry base delay must be greater than zero")
+	}
+	if policy.RetryBackoff.MaxDelay <= 0 {
+		return fmt.Errorf("retry max delay must be greater than zero")
+	}
+	if policy.RetryBackoff.MaxDelay < policy.RetryBackoff.BaseDelay {
+		return fmt.Errorf("retry max delay must be greater than or equal to base delay")
+	}
+	return nil
 }
 
 func readAndCloseBody(resp *http.Response, maxBytes int64) ([]byte, error) {
