@@ -16,7 +16,7 @@
 
 - [已完成] 增强 rate limit API 表达能力，避免只依赖单一 RPS 语义
 - [已完成] 打磨 retry / backoff / cooldown 语义与限流配合方式
-- [待开始] 增加 host / session 级并发与限速控制的扩展能力
+- [已完成] 增加 host / session 级并发与限速控制的扩展能力
 - [已完成] 为错误体提供安全预览能力，降低生产日志误用风险
 - [待开始] 明确易变 payload 的 `json.RawMessage` 使用策略
 
