@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/GoFurry/steam-go/internal/request"
 	itraffic "github.com/GoFurry/steam-go/internal/traffic"
@@ -51,6 +52,11 @@ type TrafficSessionControlPolicy struct {
 	MaxConcurrent int
 }
 
+// TrafficCachePolicy overrides per-class conditional-request and short-cache behavior.
+type TrafficCachePolicy struct {
+	TTL time.Duration
+}
+
 // TrafficPolicy overrides selected request behavior for one traffic class.
 type TrafficPolicy struct {
 	ProxySelector   ProxySelector
@@ -59,6 +65,7 @@ type TrafficPolicy struct {
 	Retry           *TrafficRetryPolicy
 	HostControl     *TrafficHostControlPolicy
 	SessionControl  *TrafficSessionControlPolicy
+	Cache           *TrafficCachePolicy
 	HeaderProfile   *HeaderProfile
 	RefererSelector RefererSelector
 }
@@ -87,6 +94,7 @@ type trafficPolicyConfig struct {
 	retry             *TrafficRetryPolicy
 	hostControl       *TrafficHostControlPolicy
 	sessionControl    *TrafficSessionControlPolicy
+	cache             *TrafficCachePolicy
 	headerProfile     *HeaderProfile
 	refererSelector   RefererSelector
 	cookieJarProvided bool
@@ -122,6 +130,9 @@ func WithTrafficPolicy(class TrafficClass, policy TrafficPolicy) Option {
 		if err := validateTrafficSessionControlPolicy(policy.SessionControl); err != nil {
 			return err
 		}
+		if err := validateTrafficCachePolicy(policy.Cache); err != nil {
+			return err
+		}
 		if cfg.trafficPolicies == nil {
 			cfg.trafficPolicies = make(map[TrafficClass]trafficPolicyConfig)
 		}
@@ -132,6 +143,7 @@ func WithTrafficPolicy(class TrafficClass, policy TrafficPolicy) Option {
 			retry:             policy.Retry,
 			hostControl:       policy.HostControl,
 			sessionControl:    policy.SessionControl,
+			cache:             policy.Cache,
 			headerProfile:     cloneHeaderProfile(policy.HeaderProfile),
 			refererSelector:   policy.RefererSelector,
 			cookieJarProvided: policy.CookieJar != nil,
@@ -193,6 +205,16 @@ func validateTrafficSessionControlPolicy(policy *TrafficSessionControlPolicy) er
 	}
 	if err := validateTrafficRateLimiterPolicy(policy.RateLimiter); err != nil {
 		return fmt.Errorf("traffic policy session control: %w", err)
+	}
+	return nil
+}
+
+func validateTrafficCachePolicy(policy *TrafficCachePolicy) error {
+	if policy == nil {
+		return nil
+	}
+	if policy.TTL <= 0 {
+		return fmt.Errorf("traffic policy cache ttl must be greater than zero")
 	}
 	return nil
 }

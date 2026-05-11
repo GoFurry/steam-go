@@ -2,6 +2,7 @@ package steam
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/GoFurry/steam-go/api/accountcartservice"
 	"github.com/GoFurry/steam-go/api/billingservice"
@@ -161,6 +162,7 @@ type runtimePolicyConfig struct {
 	rateLimiter     transport.RateLimiterConfig
 	hostControl     transport.RequestControlConfig
 	sessionControl  transport.RequestControlConfig
+	cacheTTL        time.Duration
 	headerProfile   *HeaderProfile
 	refererSelector RefererSelector
 	retry           int
@@ -174,6 +176,7 @@ func buildTrafficRuntimes(cfg clientConfig) (trafficRuntimeSet, error) {
 		rateLimiter:     cfg.rateLimiter,
 		hostControl:     transport.RequestControlConfig{},
 		sessionControl:  transport.RequestControlConfig{},
+		cacheTTL:        0,
 		headerProfile:   nil,
 		refererSelector: nil,
 		retry:           cfg.retry,
@@ -196,6 +199,7 @@ func buildTrafficRuntimes(cfg clientConfig) (trafficRuntimeSet, error) {
 			rateLimiter:     cfg.rateLimiter,
 			hostControl:     transport.RequestControlConfig{},
 			sessionControl:  transport.RequestControlConfig{},
+			cacheTTL:        0,
 			headerProfile:   nil,
 			refererSelector: nil,
 			retry:           cfg.retry,
@@ -241,6 +245,9 @@ func buildTrafficRuntimes(cfg clientConfig) (trafficRuntimeSet, error) {
 				}
 			}
 		}
+		if policy.cache != nil {
+			resolved.cacheTTL = policy.cache.TTL
+		}
 		if policy.headerProfile != nil {
 			resolved.headerProfile = cloneHeaderProfile(policy.headerProfile)
 		}
@@ -275,6 +282,7 @@ func buildRuntime(cfg clientConfig, policy runtimePolicyConfig, cookieJarConfigu
 		executionPolicy: request.ExecutionPolicy{
 			Retry:          policy.retry,
 			RetryBackoff:   policy.retryBackoff,
+			CacheRuntime:   request.NewMemoryCacheRuntime(policy.cacheTTL, policy.cookieJar),
 			PrepareRequest: buildRequestPreparer(policy.headerProfile, policy.refererSelector),
 			Transport: transport.New(httpClient, transport.ClientConfig{
 				RateLimiter:    policy.rateLimiter,

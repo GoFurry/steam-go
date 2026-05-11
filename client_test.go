@@ -3738,6 +3738,182 @@ func TestTrafficPolicyAppliesRefererSelectorByClass(t *testing.T) {
 	}
 }
 
+func TestTrafficPolicyCacheReturnsFreshBodyWithinTTL(t *testing.T) {
+	t.Parallel()
+
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		w.Header().Set("ETag", `"etag-a"`)
+		_, _ = w.Write([]byte(`{"response":{"players":[{"steamid":"1","personaname":"cached"}]}}`))
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithBaseURL(server.URL),
+		steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+			Cache: &steam.TrafficCachePolicy{TTL: time.Minute},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	storeCtx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
+	for range 2 {
+		resp, err := client.API.SteamUser.GetPlayerSummaries(storeCtx, []string{"1"})
+		if err != nil {
+			t.Fatalf("store request returned error: %v", err)
+		}
+		if len(resp.Response.Players) != 1 || resp.Response.Players[0].PersonaName != "cached" {
+			t.Fatalf("unexpected cached response: %#v", resp.Response.Players)
+		}
+	}
+
+	if got := requestCount.Load(); got != 1 {
+		t.Fatalf("expected one origin request, got %d", got)
+	}
+}
+
+func TestTrafficPolicyCacheUsesConditionalRequestOnExpiry(t *testing.T) {
+	t.Parallel()
+
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch requestCount.Add(1) {
+		case 1:
+			w.Header().Set("ETag", `"etag-a"`)
+			_, _ = w.Write([]byte(`{"response":{"players":[{"steamid":"1","personaname":"cached"}]}}`))
+		case 2:
+			if got := r.Header.Get("If-None-Match"); got != `"etag-a"` {
+				t.Fatalf("unexpected If-None-Match header: %q", got)
+			}
+			w.WriteHeader(http.StatusNotModified)
+		default:
+			t.Fatalf("unexpected extra request")
+		}
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithBaseURL(server.URL),
+		steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+			Cache: &steam.TrafficCachePolicy{TTL: 20 * time.Millisecond},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	storeCtx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
+	resp, err := client.API.SteamUser.GetPlayerSummaries(storeCtx, []string{"1"})
+	if err != nil {
+		t.Fatalf("first store request returned error: %v", err)
+	}
+	if got := resp.Response.Players[0].PersonaName; got != "cached" {
+		t.Fatalf("unexpected first response body: %q", got)
+	}
+
+	time.Sleep(40 * time.Millisecond)
+
+	resp, err = client.API.SteamUser.GetPlayerSummaries(storeCtx, []string{"1"})
+	if err != nil {
+		t.Fatalf("second store request returned error: %v", err)
+	}
+	if got := resp.Response.Players[0].PersonaName; got != "cached" {
+		t.Fatalf("unexpected cached response after 304: %q", got)
+	}
+
+	if got := requestCount.Load(); got != 2 {
+		t.Fatalf("expected conditional revalidation request, got %d origin requests", got)
+	}
+}
+
+func TestTrafficPolicyCacheIsolatesByClassAndSession(t *testing.T) {
+	t.Parallel()
+
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch requestCount.Add(1) {
+		case 1:
+			_, _ = w.Write([]byte(`{"response":{"players":[{"steamid":"1","personaname":"official"}]}}`))
+		case 2:
+			_, _ = w.Write([]byte(`{"response":{"players":[{"steamid":"1","personaname":"store-a"}]}}`))
+		case 3:
+			_, _ = w.Write([]byte(`{"response":{"players":[{"steamid":"1","personaname":"store-b"}]}}`))
+		default:
+			t.Fatalf("unexpected extra request")
+		}
+	}))
+	defer server.Close()
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithBaseURL(server.URL),
+		steam.WithTrafficPolicy(steam.TrafficClassOfficialAPI, steam.TrafficPolicy{
+			Cache: &steam.TrafficCachePolicy{TTL: time.Minute},
+		}),
+		steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+			Cache: &steam.TrafficCachePolicy{TTL: time.Minute},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	officialResp, err := client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	if err != nil {
+		t.Fatalf("official request returned error: %v", err)
+	}
+	if got := officialResp.Response.Players[0].PersonaName; got != "official" {
+		t.Fatalf("unexpected official body: %q", got)
+	}
+	officialResp, err = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"})
+	if err != nil {
+		t.Fatalf("second official request returned error: %v", err)
+	}
+	if got := officialResp.Response.Players[0].PersonaName; got != "official" {
+		t.Fatalf("unexpected cached official body: %q", got)
+	}
+
+	storeCtxA := steam.WithRequestSessionKey(
+		steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage),
+		"session-a",
+	)
+	storeResp, err := client.API.SteamUser.GetPlayerSummaries(storeCtxA, []string{"1"})
+	if err != nil {
+		t.Fatalf("store session-a request returned error: %v", err)
+	}
+	if got := storeResp.Response.Players[0].PersonaName; got != "store-a" {
+		t.Fatalf("unexpected store session-a body: %q", got)
+	}
+	storeResp, err = client.API.SteamUser.GetPlayerSummaries(storeCtxA, []string{"1"})
+	if err != nil {
+		t.Fatalf("second store session-a request returned error: %v", err)
+	}
+	if got := storeResp.Response.Players[0].PersonaName; got != "store-a" {
+		t.Fatalf("unexpected cached store session-a body: %q", got)
+	}
+
+	storeCtxB := steam.WithRequestSessionKey(
+		steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage),
+		"session-b",
+	)
+	storeResp, err = client.API.SteamUser.GetPlayerSummaries(storeCtxB, []string{"1"})
+	if err != nil {
+		t.Fatalf("store session-b request returned error: %v", err)
+	}
+	if got := storeResp.Response.Players[0].PersonaName; got != "store-b" {
+		t.Fatalf("unexpected store session-b body: %q", got)
+	}
+
+	if got := requestCount.Load(); got != 3 {
+		t.Fatalf("expected cache isolation by class and session, got %d origin requests", got)
+	}
+}
+
 func TestWithHTTPClientAndDefaultCookieJarUsesClonedJar(t *testing.T) {
 	t.Parallel()
 

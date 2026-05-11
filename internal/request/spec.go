@@ -66,6 +66,7 @@ type ExecutionPolicy struct {
 	Retry          int
 	RetryBackoff   RetryBackoffConfig
 	Transport      Transport
+	CacheRuntime   CacheRuntime
 	PrepareRequest RequestPreparer
 }
 
@@ -124,7 +125,8 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	policy := e.executionPolicy(ctx, spec.TrafficClass)
+	class := e.executionClass(ctx, spec.TrafficClass)
+	policy := e.executionPolicyForClass(class)
 
 	var lastErr error
 	for attempt := 0; attempt <= policy.Retry; attempt++ {
@@ -135,6 +137,16 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 		if policy.PrepareRequest != nil {
 			if err := policy.PrepareRequest(req); err != nil {
 				return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "prepare request failed", nil, err)
+			}
+		}
+		cacheLookup := cacheLookup{}
+		if policy.CacheRuntime != nil && requestCacheable(req) {
+			cacheLookup = policy.CacheRuntime.lookup(req, time.Now())
+			if cacheLookup.fresh {
+				return cloneBytes(cacheLookup.body), nil
+			}
+			if cacheLookupAllowsConditionalRequest(cacheLookup) {
+				applyConditionalCacheHeaders(req, cacheLookup)
 			}
 		}
 
@@ -148,6 +160,12 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 				continue
 			}
 			return nil, lastErr
+		}
+		if resp.StatusCode == http.StatusNotModified && cacheLookup.found && policy.CacheRuntime != nil {
+			if body, ok := policy.CacheRuntime.refresh(cacheLookup, resp, time.Now()); ok {
+				_ = resp.Body.Close()
+				return body, nil
+			}
 		}
 
 		body, readErr := readAndCloseBody(resp, e.maxResponseBodyBytes)
@@ -181,6 +199,9 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 				continue
 			}
 			return nil, lastErr
+		}
+		if policy.CacheRuntime != nil && requestCacheable(req) {
+			policy.CacheRuntime.store(req, resp, body, time.Now())
 		}
 
 		return body, nil
@@ -286,11 +307,19 @@ func (e *Executor) buildRequest(ctx context.Context, resolved *url.URL, spec Req
 	return req, nil
 }
 
-func (e *Executor) executionPolicy(ctx context.Context, specClass traffic.Class) ExecutionPolicy {
+func (e *Executor) executionClass(ctx context.Context, specClass traffic.Class) traffic.Class {
 	class := traffic.NormalizeClass(specClass)
 	if ctxClass, ok := traffic.ClassFromContext(ctx); ok {
 		class = ctxClass
 	}
+	return class
+}
+
+func (e *Executor) executionPolicy(ctx context.Context, specClass traffic.Class) ExecutionPolicy {
+	return e.executionPolicyForClass(e.executionClass(ctx, specClass))
+}
+
+func (e *Executor) executionPolicyForClass(class traffic.Class) ExecutionPolicy {
 	if policy, ok := e.classPolicies[class]; ok {
 		return policy
 	}

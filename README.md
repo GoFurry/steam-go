@@ -203,10 +203,11 @@ fmt.Printf("healthy=%d cooling=%d\n", metrics.HealthyProxies, metrics.CoolingPro
 
 - `TrafficClassOfficialAPI` is the default for existing typed `client.API.*` methods
 - `TrafficClassPublicStorePage` is reserved for future public store-page integrations
-- `WithTrafficPolicy(...)` overrides proxy, cookie jar, retry, rate limit, header profile, and Referer strategy per class
+- `WithTrafficPolicy(...)` overrides proxy, cookie jar, retry, rate limit, short-cache, header profile, and Referer strategy per class
 - `WithTrafficClass(ctx, class)` lets one request opt into a non-default class
 - `DefaultPublicStoreHeaderProfileZH()` and `DefaultPublicStoreHeaderProfileEN()` provide stable browser-like header presets
 - `WithRefererSource(ctx, rawURL)` plus `NewStaticRefererSelector(...)`, `NewRoutingRefererSelector(...)`, and `NewContextRefererSelector(...)` support fixed, routed, and context-driven Referer policies
+- `TrafficCachePolicy{TTL: ...}` enables per-class in-memory short caching with `ETag` / `Last-Modified` revalidation for `GET` requests
 
 Example:
 
@@ -240,6 +241,7 @@ if err != nil {
 client, err := steam.NewClient(
 	steam.WithAPIKey("your-key"),
 	steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+		Cache:          &steam.TrafficCachePolicy{TTL: time.Minute},
 		HeaderProfile:  &profile,
 		RefererSelector: refererSelector,
 	}),

@@ -252,6 +252,7 @@ func TestWithTrafficPolicyStoresPerClassPolicy(t *testing.T) {
 			},
 			MaxConcurrent: 5,
 		},
+		Cache:           &TrafficCachePolicy{TTL: time.Minute},
 		HeaderProfile:   &profile,
 		RefererSelector: selector,
 	})(&cfg); err != nil {
@@ -282,6 +283,9 @@ func TestWithTrafficPolicyStoresPerClassPolicy(t *testing.T) {
 	}
 	if policy.sessionControl.RateLimiter == nil || policy.sessionControl.RateLimiter.Limit != rate.Limit(1) || policy.sessionControl.RateLimiter.Burst != 2 {
 		t.Fatalf("unexpected session control limiter: %#v", policy.sessionControl)
+	}
+	if policy.cache == nil || policy.cache.TTL != time.Minute {
+		t.Fatalf("unexpected cache policy: %#v", policy.cache)
 	}
 	if policy.headerProfile == nil || policy.headerProfile.AcceptLanguage != profile.AcceptLanguage {
 		t.Fatalf("unexpected header profile: %#v", policy.headerProfile)
@@ -349,6 +353,18 @@ func TestWithTrafficPolicyRejectsInvalidSessionRateLimiter(t *testing.T) {
 	})(&cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid session rate limiter")
+	}
+}
+
+func TestWithTrafficPolicyRejectsInvalidCacheTTL(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultClientConfig()
+	err := WithTrafficPolicy(TrafficClassPublicStorePage, TrafficPolicy{
+		Cache: &TrafficCachePolicy{TTL: 0},
+	})(&cfg)
+	if err == nil {
+		t.Fatal("expected error for zero cache ttl")
 	}
 }
 
