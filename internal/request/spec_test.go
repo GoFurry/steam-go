@@ -27,6 +27,7 @@ func TestExecutorSupportsRequestBody(t *testing.T) {
 		nil,
 		nil,
 		0,
+		request.DefaultRetryBackoffConfig(),
 		1024,
 		recorder,
 	)
@@ -84,6 +85,7 @@ func TestExecutorReusesRequestBodyAcrossRetries(t *testing.T) {
 		auth.NewStaticKeyProvider("demo-key"),
 		auth.NewStaticAccessTokenProvider("demo-token"),
 		1,
+		request.DefaultRetryBackoffConfig(),
 		1024,
 		recorder,
 	)
@@ -132,6 +134,7 @@ func TestExecutorRotatesAccessTokenOnUnauthorizedRetry(t *testing.T) {
 		nil,
 		auth.NewRoundRobinAccessTokenProvider("token-a", "token-b"),
 		1,
+		request.DefaultRetryBackoffConfig(),
 		1024,
 		recorder,
 	)
@@ -172,6 +175,7 @@ func TestExecutorPreservesExplicitContentTypeHeader(t *testing.T) {
 		nil,
 		nil,
 		0,
+		request.DefaultRetryBackoffConfig(),
 		1024,
 		recorder,
 	)
@@ -209,6 +213,7 @@ func TestExecutorPreservesExplicitCredentialsFromQuery(t *testing.T) {
 		auth.NewStaticKeyProvider("global-key"),
 		auth.NewStaticAccessTokenProvider("global-token"),
 		0,
+		request.DefaultRetryBackoffConfig(),
 		1024,
 		recorder,
 	)
@@ -324,6 +329,7 @@ func TestExecutorRejectsResponsesThatExceedBodyLimit(t *testing.T) {
 		nil,
 		nil,
 		0,
+		request.DefaultRetryBackoffConfig(),
 		8,
 		recorder,
 	)
@@ -344,7 +350,7 @@ func TestExecutorRejectsResponsesThatExceedBodyLimit(t *testing.T) {
 func TestExecutorReportsRequestBuildErrorForInvalidMethod(t *testing.T) {
 	t.Parallel()
 
-	executor, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, 1024, &recordingTransport{})
+	executor, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, request.DefaultRetryBackoffConfig(), 1024, &recordingTransport{})
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
@@ -359,7 +365,7 @@ func TestExecutorReportsRequestBuildErrorForInvalidMethod(t *testing.T) {
 func TestExecutorRejectsInvalidBodyLimit(t *testing.T) {
 	t.Parallel()
 
-	_, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, 0, &recordingTransport{})
+	_, err := request.NewExecutor("https://api.steampowered.com", nil, nil, 0, request.DefaultRetryBackoffConfig(), 0, &recordingTransport{})
 	var apiErr *sdkerrors.APIError
 	if err == nil || !errors.As(err, &apiErr) || apiErr.Kind != sdkerrors.KindRequestBuild {
 		t.Fatalf("expected request_build error, got %v", err)

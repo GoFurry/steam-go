@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/GoFurry/steam-go/internal/auth"
+	"github.com/GoFurry/steam-go/internal/request"
 	"github.com/GoFurry/steam-go/internal/transport"
 	"golang.org/x/time/rate"
 )
@@ -36,6 +37,7 @@ type clientConfig struct {
 	timeout              time.Duration
 	retry                int
 	rateLimiter          transport.RateLimiterConfig
+	retryBackoff         request.RetryBackoffConfig
 	maxResponseBodyBytes int64
 	proxySelector        ProxySelector
 }
@@ -45,6 +47,7 @@ func defaultClientConfig() clientConfig {
 		baseURL:              defaultBaseURL,
 		timeout:              10 * time.Second,
 		retry:                0,
+		retryBackoff:         request.DefaultRetryBackoffConfig(),
 		maxResponseBodyBytes: 16 << 20,
 	}
 }
@@ -155,6 +158,32 @@ func WithRetry(retry int) Option {
 			return fmt.Errorf("retry must not be negative")
 		}
 		cfg.retry = retry
+		return nil
+	}
+}
+
+// WithRetryBackoff configures the local retry backoff behavior.
+func WithRetryBackoff(baseDelay, maxDelay time.Duration) Option {
+	return func(cfg *clientConfig) error {
+		if baseDelay <= 0 {
+			return fmt.Errorf("retry base delay must be greater than zero")
+		}
+		if maxDelay <= 0 {
+			return fmt.Errorf("retry max delay must be greater than zero")
+		}
+		if maxDelay < baseDelay {
+			return fmt.Errorf("retry max delay must be greater than or equal to base delay")
+		}
+		cfg.retryBackoff.BaseDelay = baseDelay
+		cfg.retryBackoff.MaxDelay = maxDelay
+		return nil
+	}
+}
+
+// WithRetryRespectRetryAfter controls whether Retry-After should override local backoff.
+func WithRetryRespectRetryAfter(enabled bool) Option {
+	return func(cfg *clientConfig) error {
+		cfg.retryBackoff.RespectRetryAfter = enabled
 		return nil
 	}
 }

@@ -2,7 +2,9 @@ package steam
 
 import (
 	"testing"
+	"time"
 
+	"github.com/GoFurry/steam-go/internal/request"
 	"github.com/GoFurry/steam-go/internal/transport"
 	"golang.org/x/time/rate"
 )
@@ -84,5 +86,50 @@ func TestWithRateLimitCanDisableExplicitLimiter(t *testing.T) {
 	}
 	if cfg.rateLimiter != (transport.RateLimiterConfig{}) {
 		t.Fatalf("expected limiter to be disabled, got %#v", cfg.rateLimiter)
+	}
+}
+
+func TestWithRetryBackoffOverridesDefaultConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultClientConfig()
+	if err := WithRetryBackoff(250*time.Millisecond, 3*time.Second)(&cfg); err != nil {
+		t.Fatalf("WithRetryBackoff returned error: %v", err)
+	}
+
+	want := request.RetryBackoffConfig{
+		BaseDelay:         250 * time.Millisecond,
+		MaxDelay:          3 * time.Second,
+		RespectRetryAfter: true,
+	}
+	if cfg.retryBackoff != want {
+		t.Fatalf("retryBackoff = %#v, want %#v", cfg.retryBackoff, want)
+	}
+}
+
+func TestWithRetryBackoffRejectsInvalidValues(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultClientConfig()
+	if err := WithRetryBackoff(0, time.Second)(&cfg); err == nil {
+		t.Fatal("expected error for zero base delay")
+	}
+	if err := WithRetryBackoff(time.Second, 0)(&cfg); err == nil {
+		t.Fatal("expected error for zero max delay")
+	}
+	if err := WithRetryBackoff(2*time.Second, time.Second)(&cfg); err == nil {
+		t.Fatal("expected error when max delay is smaller than base delay")
+	}
+}
+
+func TestWithRetryRespectRetryAfterOverridesDefault(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultClientConfig()
+	if err := WithRetryRespectRetryAfter(false)(&cfg); err != nil {
+		t.Fatalf("WithRetryRespectRetryAfter returned error: %v", err)
+	}
+	if cfg.retryBackoff.RespectRetryAfter {
+		t.Fatal("expected Retry-After handling to be disabled")
 	}
 }

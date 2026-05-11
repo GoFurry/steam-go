@@ -40,6 +40,7 @@ type Executor struct {
 	apiKeyProvider       auth.APIKeyProvider
 	accessTokenProvider  auth.AccessTokenProvider
 	retry                int
+	retryBackoff         RetryBackoffConfig
 	maxResponseBodyBytes int64
 	transport            Transport
 }
@@ -49,11 +50,36 @@ type requestCredentials struct {
 	accessToken string
 }
 
+// RetryBackoffConfig controls local retry delay behavior.
+type RetryBackoffConfig struct {
+	BaseDelay         time.Duration
+	MaxDelay          time.Duration
+	RespectRetryAfter bool
+}
+
+// DefaultRetryBackoffConfig returns the SDK retry defaults.
+func DefaultRetryBackoffConfig() RetryBackoffConfig {
+	return RetryBackoffConfig{
+		BaseDelay:         100 * time.Millisecond,
+		MaxDelay:          2 * time.Second,
+		RespectRetryAfter: true,
+	}
+}
+
 // NewExecutor creates a request executor.
-func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, maxResponseBodyBytes int64, transport Transport) (*Executor, error) {
+func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessTokenProvider auth.AccessTokenProvider, retry int, retryBackoff RetryBackoffConfig, maxResponseBodyBytes int64, transport Transport) (*Executor, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "invalid base url", nil, err)
+	}
+	if retryBackoff.BaseDelay <= 0 {
+		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "retry base delay must be greater than zero", nil, nil)
+	}
+	if retryBackoff.MaxDelay <= 0 {
+		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "retry max delay must be greater than zero", nil, nil)
+	}
+	if retryBackoff.MaxDelay < retryBackoff.BaseDelay {
+		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "retry max delay must be greater than or equal to base delay", nil, nil)
 	}
 	if maxResponseBodyBytes <= 0 {
 		return nil, sdkerrors.New(sdkerrors.KindRequestBuild, 0, "max response body bytes must be greater than zero", nil, nil)
@@ -63,6 +89,7 @@ func NewExecutor(baseURL string, apiKeyProvider auth.APIKeyProvider, accessToken
 		apiKeyProvider:       apiKeyProvider,
 		accessTokenProvider:  accessTokenProvider,
 		retry:                retry,
+		retryBackoff:         retryBackoff,
 		maxResponseBodyBytes: maxResponseBodyBytes,
 		transport:            transport,
 	}, nil
@@ -96,7 +123,7 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 		if err != nil {
 			lastErr = sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, err)
 			if shouldRetryTransport(ctx, err) && attempt < e.retry {
-				if !sleepBeforeRetry(ctx, attempt, nil) {
+				if !sleepBeforeRetry(ctx, attempt, nil, e.retryBackoff) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -108,7 +135,7 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 		if readErr != nil {
 			lastErr = sdkerrors.New(sdkerrors.KindTransport, resp.StatusCode, "read response body failed", nil, readErr)
 			if attempt < e.retry {
-				if !sleepBeforeRetry(ctx, attempt, resp) {
+				if !sleepBeforeRetry(ctx, attempt, resp, e.retryBackoff) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -129,7 +156,7 @@ func (e *Executor) DoRaw(ctx context.Context, spec RequestSpec) ([]byte, error) 
 				if err != nil {
 					return nil, err
 				}
-				if !sleepBeforeRetry(ctx, attempt, resp) {
+				if !sleepBeforeRetry(ctx, attempt, resp, e.retryBackoff) {
 					return nil, sdkerrors.New(sdkerrors.KindTransport, 0, "request execution failed", nil, ctx.Err())
 				}
 				continue
@@ -278,8 +305,8 @@ func shouldRotateCredentials(statusCode int) bool {
 	return statusCode == http.StatusUnauthorized || statusCode == http.StatusTooManyRequests
 }
 
-func sleepBeforeRetry(ctx context.Context, attempt int, resp *http.Response) bool {
-	delay := retryDelay(attempt, resp, time.Now())
+func sleepBeforeRetry(ctx context.Context, attempt int, resp *http.Response, cfg RetryBackoffConfig) bool {
+	delay := retryDelay(attempt, resp, time.Now(), cfg)
 	select {
 	case <-ctx.Done():
 		return false
@@ -288,17 +315,33 @@ func sleepBeforeRetry(ctx context.Context, attempt int, resp *http.Response) boo
 	}
 }
 
-func retryDelay(attempt int, resp *http.Response, now time.Time) time.Duration {
-	if delay, ok := retryAfterDelay(resp, now); ok {
-		return delay
+func retryDelay(attempt int, resp *http.Response, now time.Time, cfg RetryBackoffConfig) time.Duration {
+	if cfg.RespectRetryAfter {
+		if delay, ok := retryAfterDelay(resp, now); ok {
+			return delay
+		}
 	}
 
-	baseDelay := time.Duration(attempt+1) * 100 * time.Millisecond
-	jitterWindow := baseDelay / 2
-	if jitterWindow <= 0 {
-		return baseDelay
+	delay := cfg.BaseDelay
+	for i := 0; i < attempt; i++ {
+		if delay >= cfg.MaxDelay {
+			break
+		}
+		if delay > cfg.MaxDelay/2 {
+			delay = cfg.MaxDelay
+			break
+		}
+		delay *= 2
 	}
-	return baseDelay + time.Duration(rand.Int64N(int64(jitterWindow)+1))
+	if delay > cfg.MaxDelay {
+		delay = cfg.MaxDelay
+	}
+
+	jitterWindow := delay / 2
+	if jitterWindow <= 0 {
+		return delay
+	}
+	return delay + time.Duration(rand.Int64N(int64(jitterWindow)+1))
 }
 
 func retryAfterDelay(resp *http.Response, now time.Time) (time.Duration, bool) {

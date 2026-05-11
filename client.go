@@ -93,6 +93,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		cfg.apiKeyProvider,
 		cfg.accessTokenProvider,
 		cfg.retry,
+		cfg.retryBackoff,
 		cfg.maxResponseBodyBytes,
 		rt,
 	)
