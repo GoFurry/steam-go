@@ -355,7 +355,7 @@ func buildHTTPClient(cfg clientConfig, jar http.CookieJar, cookieJarConfigured b
 
 	return &http.Client{
 		Timeout:   cfg.timeout,
-		Transport: http.DefaultTransport,
+		Transport: cloneDefaultTransport(),
 		Jar:       jar,
 	}, nil
 }
@@ -370,4 +370,11 @@ func cloneHTTPClient(base *http.Client) *http.Client {
 		cloned.Transport = transport.Clone()
 	}
 	return &cloned
+}
+
+func cloneDefaultTransport() http.RoundTripper {
+	if transport, ok := http.DefaultTransport.(*http.Transport); ok && transport != nil {
+		return transport.Clone()
+	}
+	return http.DefaultTransport
 }

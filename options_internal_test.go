@@ -361,6 +361,27 @@ func TestWithTrafficPolicyStoresPerClassPolicy(t *testing.T) {
 	}
 }
 
+func TestBuildHTTPClientClonesDefaultTransport(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultClientConfig()
+	first, err := buildHTTPClient(cfg, nil, false)
+	if err != nil {
+		t.Fatalf("buildHTTPClient returned error: %v", err)
+	}
+	second, err := buildHTTPClient(cfg, nil, false)
+	if err != nil {
+		t.Fatalf("buildHTTPClient returned error: %v", err)
+	}
+
+	if first.Transport == http.DefaultTransport || second.Transport == http.DefaultTransport {
+		t.Fatal("expected default clients to clone http.DefaultTransport")
+	}
+	if first.Transport == second.Transport {
+		t.Fatal("expected each default client to receive its own transport clone")
+	}
+}
+
 func TestWithTrafficPolicyRejectsUnsupportedClass(t *testing.T) {
 	t.Parallel()
 
