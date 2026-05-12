@@ -523,7 +523,7 @@ func (s *healthCheckedRoundRobinProxySelector) ProxyMetricsSnapshot() ProxyMetri
 			snapshot.CoolingProxies++
 		}
 		snapshot.Proxies = append(snapshot.Proxies, ProxyEndpointMetrics{
-			ProxyURL:       proxyURL.String(),
+			ProxyURL:       redactedProxyURLString(proxyURL),
 			FailureScore:   state.failureScore,
 			CooldownUntil:  state.cooldownUntil,
 			SelectionCount: state.selectionCount,
@@ -620,6 +620,15 @@ func cloneProxyURL(proxyURL *url.URL) *url.URL {
 	}
 	cloned := *proxyURL
 	return &cloned
+}
+
+func redactedProxyURLString(proxyURL *url.URL) string {
+	if proxyURL == nil {
+		return ""
+	}
+	cloned := cloneProxyURL(proxyURL)
+	cloned.User = nil
+	return cloned.String()
 }
 
 func proxyResultFailed(statusCode int, err error) bool {

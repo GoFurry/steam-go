@@ -592,7 +592,7 @@ func TestHealthCheckedRoundRobinProxySelectorExposesMetricsSnapshot(t *testing.T
 			FailureThreshold: 1,
 			Cooldown:         40 * time.Millisecond,
 		},
-		"http://127.0.0.1:7897",
+		"http://user:secret@127.0.0.1:7897",
 	)
 	if err != nil {
 		t.Fatalf("NewHealthCheckedRoundRobinProxySelector returned error: %v", err)
