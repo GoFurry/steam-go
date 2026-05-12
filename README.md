@@ -302,3 +302,6 @@ SDK errors use `*steam.APIError` with these kinds:
 - `api_response`
 
 Use `errors.As(err, &apiErr)` to inspect kind, status code, and raw body.
+
+Steam Web API credentials are injected through query parameters by default because that matches Steam's HTTP interface.
+Avoid logging raw request URLs in production. Use `steam.RedactSensitiveURL(...)` before sending URLs to logs, traces, or monitoring systems.
