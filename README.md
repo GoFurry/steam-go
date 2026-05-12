@@ -204,6 +204,7 @@ fmt.Printf("healthy=%d cooling=%d\n", metrics.HealthyProxies, metrics.CoolingPro
 - `TrafficClassOfficialAPI` is the default for existing typed `client.API.*` methods
 - `TrafficClassPublicStorePage` is reserved for future public store-page integrations
 - `WithTrafficPolicy(...)` overrides proxy, cookie jar, retry, rate limit, short-cache, block detection, header profile, and Referer strategy per class
+- `TransportHook` and `TransportHookFunc` reserve one per-class HTTP execution extension point for future TLS customization or browser-backed fallback
 - `WithTrafficClass(ctx, class)` lets one request opt into a non-default class
 - `DefaultPublicStoreHeaderProfileZH()` and `DefaultPublicStoreHeaderProfileEN()` provide stable browser-like header presets
 - `WithRefererSource(ctx, rawURL)` plus `NewStaticRefererSelector(...)`, `NewRoutingRefererSelector(...)`, and `NewContextRefererSelector(...)` support fixed, routed, and context-driven Referer policies
@@ -253,6 +254,28 @@ if err != nil {
 }
 ```
 
+Public store-page transport hook example:
+
+```go
+client, err := steam.NewClient(
+	steam.WithAPIKey("your-key"),
+	steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+		TransportHook: steam.TransportHookFunc(func(class steam.TrafficClass, base *http.Client) (*http.Client, error) {
+			cloned := *base
+			if transport, ok := base.Transport.(*http.Transport); ok {
+				custom := transport.Clone()
+				custom.TLSHandshakeTimeout = 5 * time.Second
+				cloned.Transport = custom
+			}
+			return &cloned, nil
+		}),
+	}),
+)
+if err != nil {
+	panic(err)
+}
+```
+
 On China-region networks, browser login may succeed while the server-side Steam OpenID `check_authentication` request still times out. The OpenID example supports `--proxy http://127.0.0.1:7897` for that case and also demonstrates cookie-backed `state` verification on the callback.
 
 ## Examples
@@ -263,6 +286,7 @@ On China-region networks, browser login may succeed while the server-side Steam 
 - `go run ./examples/openid`
 - `go run ./examples/openid --proxy http://127.0.0.1:7897`
 - `go run ./examples/proxy`
+- `go run ./examples/traffic`
 - `go run ./test/steamuser`
 - `go run ./test/playerservice`
 - `go run ./test/wishlistservice`

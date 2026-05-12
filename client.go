@@ -1,6 +1,7 @@
 package steam
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -167,6 +168,7 @@ type runtimePolicyConfig struct {
 	trafficClass    itraffic.Class
 	headerProfile   *HeaderProfile
 	refererSelector RefererSelector
+	transportHook   TransportHook
 	retry           int
 	retryBackoff    request.RetryBackoffConfig
 }
@@ -183,6 +185,7 @@ func buildTrafficRuntimes(cfg clientConfig) (trafficRuntimeSet, error) {
 		trafficClass:    itraffic.ClassOfficialAPI,
 		headerProfile:   nil,
 		refererSelector: nil,
+		transportHook:   nil,
 		retry:           cfg.retry,
 		retryBackoff:    cfg.retryBackoff,
 	}, cfg.cookieJarConfigured)
@@ -208,6 +211,7 @@ func buildTrafficRuntimes(cfg clientConfig) (trafficRuntimeSet, error) {
 			trafficClass:    itraffic.NormalizeClass(class),
 			headerProfile:   nil,
 			refererSelector: nil,
+			transportHook:   nil,
 			retry:           cfg.retry,
 			retryBackoff:    cfg.retryBackoff,
 		}
@@ -263,6 +267,9 @@ func buildTrafficRuntimes(cfg clientConfig) (trafficRuntimeSet, error) {
 		if policy.refererSelector != nil {
 			resolved.refererSelector = policy.refererSelector
 		}
+		if policy.transportHook != nil {
+			resolved.transportHook = policy.transportHook
+		}
 
 		runtime, err := buildRuntime(cfg, resolved, cookieJarConfigured)
 		if err != nil {
@@ -285,6 +292,16 @@ func buildRuntime(cfg clientConfig, policy runtimePolicyConfig, cookieJarConfigu
 	httpClient, err := buildHTTPClient(cfg, policy.proxySelector, policy.cookieJar, cookieJarConfigured)
 	if err != nil {
 		return builtRuntime{}, err
+	}
+	if policy.transportHook != nil {
+		hookedClient, err := policy.transportHook.WrapHTTPClient(policy.trafficClass, cloneHTTPClient(httpClient))
+		if err != nil {
+			return builtRuntime{}, err
+		}
+		if hookedClient == nil {
+			return builtRuntime{}, fmt.Errorf("transport hook returned a nil http client")
+		}
+		httpClient = hookedClient
 	}
 	return builtRuntime{
 		httpClient: httpClient,
@@ -312,7 +329,7 @@ func blockSniffBytes(policy *TrafficBlockPolicy) int {
 
 func buildHTTPClient(cfg clientConfig, selector ProxySelector, jar http.CookieJar, cookieJarConfigured bool) (*http.Client, error) {
 	if cfg.httpClient != nil {
-		cloned := *cfg.httpClient
+		cloned := cloneHTTPClient(cfg.httpClient)
 		cloned.Timeout = cfg.timeout
 		if cookieJarConfigured {
 			cloned.Jar = jar
@@ -322,7 +339,7 @@ func buildHTTPClient(cfg clientConfig, selector ProxySelector, jar http.CookieJa
 			return nil, err
 		}
 		cloned.Transport = rt
-		return &cloned, nil
+		return cloned, nil
 	}
 
 	rt, err := transport.WrapRoundTripper(nil, selector)
@@ -334,4 +351,16 @@ func buildHTTPClient(cfg clientConfig, selector ProxySelector, jar http.CookieJa
 		Transport: rt,
 		Jar:       jar,
 	}, nil
+}
+
+func cloneHTTPClient(base *http.Client) *http.Client {
+	if base == nil {
+		return nil
+	}
+
+	cloned := *base
+	if transport, ok := cloned.Transport.(*http.Transport); ok && transport != nil {
+		cloned.Transport = transport.Clone()
+	}
+	return &cloned
 }

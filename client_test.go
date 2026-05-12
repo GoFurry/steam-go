@@ -4049,6 +4049,136 @@ func TestTrafficPolicyOfficialAPIKeepsGenericForbiddenHandling(t *testing.T) {
 	}
 }
 
+func TestTrafficPolicyAppliesTransportHookByClass(t *testing.T) {
+	t.Parallel()
+
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch requestCount.Add(1) {
+		case 1:
+			if got := r.Header.Get("X-Transport-Hook"); got != "official" {
+				t.Fatalf("unexpected official hook header: %q", got)
+			}
+		case 2:
+			if got := r.Header.Get("X-Transport-Hook"); got != "store" {
+				t.Fatalf("unexpected store hook header: %q", got)
+			}
+		default:
+			t.Fatalf("unexpected extra request")
+		}
+		_, _ = w.Write([]byte(`{"response":{"players":[]}}`))
+	}))
+	defer server.Close()
+
+	makeHook := func(value string) steam.TransportHook {
+		return steam.TransportHookFunc(func(class steam.TrafficClass, base *http.Client) (*http.Client, error) {
+			cloned := *base
+			baseRT := cloned.Transport
+			cloned.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				req = req.Clone(req.Context())
+				req.Header.Set("X-Transport-Hook", value)
+				return baseRT.RoundTrip(req)
+			})
+			return &cloned, nil
+		})
+	}
+
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithBaseURL(server.URL),
+		steam.WithTrafficPolicy(steam.TrafficClassOfficialAPI, steam.TrafficPolicy{
+			TransportHook: makeHook("official"),
+		}),
+		steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+			TransportHook: makeHook("store"),
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+
+	if _, err := client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"1"}); err != nil {
+		t.Fatalf("official request returned error: %v", err)
+	}
+	storeCtx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
+	if _, err := client.API.SteamUser.GetPlayerSummaries(storeCtx, []string{"1"}); err != nil {
+		t.Fatalf("store request returned error: %v", err)
+	}
+}
+
+func TestTrafficPolicyTransportHookSeesAssembledBaseClient(t *testing.T) {
+	t.Parallel()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookiejar.New returned error: %v", err)
+	}
+
+	var sawHook atomic.Bool
+	client, err := steam.NewClient(
+		steam.WithAPIKey("test-key"),
+		steam.WithBaseURL("https://api.steampowered.com"),
+		steam.WithTimeout(3*time.Second),
+		steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+			CookieJar: jar,
+			TransportHook: steam.TransportHookFunc(func(class steam.TrafficClass, base *http.Client) (*http.Client, error) {
+				if class != steam.TrafficClassPublicStorePage {
+					t.Fatalf("unexpected traffic class: %s", class)
+				}
+				if base.Timeout != 3*time.Second {
+					t.Fatalf("unexpected hook timeout: %v", base.Timeout)
+				}
+				if base.Jar != jar {
+					t.Fatalf("expected hook to see class cookie jar, got %#v", base.Jar)
+				}
+				if base.Transport == nil {
+					t.Fatal("expected hook to see assembled transport")
+				}
+				sawHook.Store(true)
+				cloned := *base
+				return &cloned, nil
+			}),
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient returned error: %v", err)
+	}
+	if !sawHook.Load() {
+		t.Fatal("expected transport hook to run during client build")
+	}
+	client.Close()
+}
+
+func TestTrafficPolicyTransportHookRejectsNilClient(t *testing.T) {
+	t.Parallel()
+
+	_, err := steam.NewClient(
+		steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+			TransportHook: steam.TransportHookFunc(func(class steam.TrafficClass, base *http.Client) (*http.Client, error) {
+				return nil, nil
+			}),
+		}),
+	)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestTrafficPolicyTransportHookPropagatesBuildError(t *testing.T) {
+	t.Parallel()
+
+	_, err := steam.NewClient(
+		steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+			TransportHook: steam.TransportHookFunc(func(class steam.TrafficClass, base *http.Client) (*http.Client, error) {
+				return nil, errors.New("hook failed")
+			}),
+		}),
+	)
+	if err == nil || !strings.Contains(err.Error(), "hook failed") {
+		t.Fatalf("expected hook error, got %v", err)
+	}
+}
+
 func TestWithHTTPClientAndDefaultCookieJarUsesClonedJar(t *testing.T) {
 	t.Parallel()
 

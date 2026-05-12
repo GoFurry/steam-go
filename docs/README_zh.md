@@ -126,6 +126,7 @@ if err != nil {
 - `TrafficClassOfficialAPI`：现有 typed `client.API.*` 方法的默认类别
 - `TrafficClassPublicStorePage`：为后续公开商店页接入预留的类别
 - `WithTrafficPolicy(...)`：按类别覆盖 proxy、cookie jar、retry、rate limit、短缓存、block 检测、header profile 和 Referer 策略
+- `TransportHook` / `TransportHookFunc`：为某个流量类别预留 HTTP 执行栈扩展点，方便后续接自定义 TLS 或浏览器回退方案
 - `WithTrafficClass(ctx, class)`：让单次请求显式切到非默认类别
 - `DefaultPublicStoreHeaderProfileZH()` / `DefaultPublicStoreHeaderProfileEN()`：提供稳定的浏览器式请求头预设
 - `WithRefererSource(ctx, rawURL)`、`NewStaticRefererSelector(...)`、`NewRoutingRefererSelector(...)`、`NewContextRefererSelector(...)`：提供固定、路由式和上下文来源式 Referer 策略
@@ -168,6 +169,28 @@ client, err := steam.NewClient(
 		BlockPolicy:     &steam.TrafficBlockPolicy{},
 		HeaderProfile:   &profile,
 		RefererSelector: refererSelector,
+	}),
+)
+if err != nil {
+	panic(err)
+}
+```
+
+公开商店页 transport hook 示例：
+
+```go
+client, err := steam.NewClient(
+	steam.WithAPIKey("your-key"),
+	steam.WithTrafficPolicy(steam.TrafficClassPublicStorePage, steam.TrafficPolicy{
+		TransportHook: steam.TransportHookFunc(func(class steam.TrafficClass, base *http.Client) (*http.Client, error) {
+			cloned := *base
+			if transport, ok := base.Transport.(*http.Transport); ok {
+				custom := transport.Clone()
+				custom.TLSHandshakeTimeout = 5 * time.Second
+				cloned.Transport = custom
+			}
+			return &cloned, nil
+		}),
 	}),
 )
 if err != nil {

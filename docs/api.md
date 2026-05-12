@@ -236,6 +236,8 @@ Notes:
 - `DefaultPublicStoreHeaderProfileEN()`
 - `RefererSelector`
 - `RefererRoute`
+- `TransportHook`
+- `TransportHookFunc`
 - `TrafficPolicy`
 - `TrafficCachePolicy`
 - `TrafficBlockPolicy`
@@ -256,6 +258,7 @@ Notes:
 - `TrafficBlockPolicy` is currently supported only on `TrafficClassPublicStorePage` and detects `429`, `403`, and HTML challenge responses.
 - `HeaderProfile` only fills missing request headers and does not override explicit values already set on the request.
 - Referer selectors run before transport execution; an explicit `Referer` header on the request still wins.
+- `TransportHook` runs during client construction after the class-specific base `http.Client` has already been assembled with timeout, proxy routing, and cookie jar settings.
 
 ## Examples
 
@@ -265,3 +268,4 @@ Notes:
 - `go run ./examples/openid`
 - `go run ./examples/openid --proxy http://127.0.0.1:7897`
 - `go run ./examples/proxy`
+- `go run ./examples/traffic`

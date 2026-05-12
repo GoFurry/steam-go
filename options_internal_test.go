@@ -228,6 +228,9 @@ func TestWithTrafficPolicyStoresPerClassPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStaticRefererSelector returned error: %v", err)
 	}
+	hook := TransportHookFunc(func(class TrafficClass, base *http.Client) (*http.Client, error) {
+		return cloneHTTPClient(base), nil
+	})
 	if err := WithTrafficPolicy(TrafficClassPublicStorePage, TrafficPolicy{
 		CookieJar: jar,
 		RateLimiter: &TrafficRateLimiterPolicy{
@@ -256,6 +259,7 @@ func TestWithTrafficPolicyStoresPerClassPolicy(t *testing.T) {
 		BlockPolicy:     &TrafficBlockPolicy{HTMLSniffBytes: 4096},
 		HeaderProfile:   &profile,
 		RefererSelector: selector,
+		TransportHook:   hook,
 	})(&cfg); err != nil {
 		t.Fatalf("WithTrafficPolicy returned error: %v", err)
 	}
@@ -296,6 +300,9 @@ func TestWithTrafficPolicyStoresPerClassPolicy(t *testing.T) {
 	}
 	if policy.refererSelector == nil {
 		t.Fatal("expected referer selector to be stored")
+	}
+	if policy.transportHook == nil {
+		t.Fatal("expected transport hook to be stored")
 	}
 }
 

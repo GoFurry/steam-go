@@ -62,6 +62,19 @@ type TrafficBlockPolicy struct {
 	HTMLSniffBytes int
 }
 
+// TransportHook customizes one class-specific HTTP execution stack after the SDK assembles its base client.
+type TransportHook interface {
+	WrapHTTPClient(class TrafficClass, base *http.Client) (*http.Client, error)
+}
+
+// TransportHookFunc adapts one function into a TransportHook.
+type TransportHookFunc func(class TrafficClass, base *http.Client) (*http.Client, error)
+
+// WrapHTTPClient implements TransportHook.
+func (f TransportHookFunc) WrapHTTPClient(class TrafficClass, base *http.Client) (*http.Client, error) {
+	return f(class, base)
+}
+
 // TrafficPolicy overrides selected request behavior for one traffic class.
 type TrafficPolicy struct {
 	ProxySelector   ProxySelector
@@ -74,6 +87,7 @@ type TrafficPolicy struct {
 	BlockPolicy     *TrafficBlockPolicy
 	HeaderProfile   *HeaderProfile
 	RefererSelector RefererSelector
+	TransportHook   TransportHook
 }
 
 // WithTrafficClass attaches one traffic class to a request context.
@@ -104,6 +118,7 @@ type trafficPolicyConfig struct {
 	blockPolicy       *TrafficBlockPolicy
 	headerProfile     *HeaderProfile
 	refererSelector   RefererSelector
+	transportHook     TransportHook
 	cookieJarProvided bool
 }
 
@@ -157,6 +172,7 @@ func WithTrafficPolicy(class TrafficClass, policy TrafficPolicy) Option {
 			blockPolicy:       policy.BlockPolicy,
 			headerProfile:     cloneHeaderProfile(policy.HeaderProfile),
 			refererSelector:   policy.RefererSelector,
+			transportHook:     policy.TransportHook,
 			cookieJarProvided: policy.CookieJar != nil,
 		}
 		return nil
