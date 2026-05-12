@@ -229,8 +229,12 @@ if err != nil {
 	panic(err)
 }
 
-ctx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
-_, _ = client.API.SteamUser.GetPlayerSummaries(ctx, []string{"76561198370695025"})
+// Keep typed Steam Web API calls on the default OfficialAPI class.
+_, _ = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"76561198370695025"})
+
+// Reserve TrafficClassPublicStorePage for future public store-page request entrypoints.
+storeCtx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
+_ = storeCtx
 ```
 
 Public store-page profile example:

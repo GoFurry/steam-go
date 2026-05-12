@@ -149,8 +149,12 @@ if err != nil {
 	panic(err)
 }
 
-ctx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
-_, _ = client.API.SteamUser.GetPlayerSummaries(ctx, []string{"76561198370695025"})
+// typed Steam Web API 调用仍然建议走默认的 OfficialAPI 类别。
+_, _ = client.API.SteamUser.GetPlayerSummaries(context.Background(), []string{"76561198370695025"})
+
+// TrafficClassPublicStorePage 预留给后续公开商店页请求入口使用。
+storeCtx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPublicStorePage)
+_ = storeCtx
 ```
 
 公开商店页请求画像示例：
