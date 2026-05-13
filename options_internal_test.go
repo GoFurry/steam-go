@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoFurry/steam-go/internal/request"
-	"github.com/GoFurry/steam-go/internal/traffic"
-	"github.com/GoFurry/steam-go/internal/transport"
+	"github.com/gofurry/steam-go/internal/request"
+	"github.com/gofurry/steam-go/internal/traffic"
+	"github.com/gofurry/steam-go/internal/transport"
 	"golang.org/x/time/rate"
 )
 

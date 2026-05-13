@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	masteraddon "github.com/GoFurry/steam-go/addons/a2s/master"
+	masteraddon "github.com/gofurry/steam-go/addons/a2s/master"
 )
 
 func TestNewClientBridgesToMaster(t *testing.T) {

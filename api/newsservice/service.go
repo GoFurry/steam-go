@@ -1,6 +1,6 @@
 package newsservice
 
-import "github.com/GoFurry/steam-go/internal/request"
+import "github.com/gofurry/steam-go/internal/request"
 
 // Service exposes INewsService methods.
 type Service struct {

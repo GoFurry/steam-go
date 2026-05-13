@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	itraffic "github.com/GoFurry/steam-go/internal/traffic"
-	itransport "github.com/GoFurry/steam-go/internal/transport"
+	itraffic "github.com/gofurry/steam-go/internal/traffic"
+	itransport "github.com/gofurry/steam-go/internal/transport"
 )
 
 const defaultProxyClientTimeout = 10 * time.Second

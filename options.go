@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoFurry/steam-go/internal/auth"
-	"github.com/GoFurry/steam-go/internal/request"
-	"github.com/GoFurry/steam-go/internal/transport"
+	"github.com/gofurry/steam-go/internal/auth"
+	"github.com/gofurry/steam-go/internal/request"
+	"github.com/gofurry/steam-go/internal/transport"
 	"golang.org/x/time/rate"
 )
 

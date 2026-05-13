@@ -1,6 +1,6 @@
 package storepreferencesservice
 
-import "github.com/GoFurry/steam-go/internal/request"
+import "github.com/gofurry/steam-go/internal/request"
 
 // Service exposes IStorePreferencesService methods.
 type Service struct {

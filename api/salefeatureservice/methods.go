@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoFurry/steam-go/internal/endpoint"
-	sdkerrors "github.com/GoFurry/steam-go/internal/errors"
-	"github.com/GoFurry/steam-go/internal/request"
-	"github.com/GoFurry/steam-go/internal/response"
+	"github.com/gofurry/steam-go/internal/endpoint"
+	sdkerrors "github.com/gofurry/steam-go/internal/errors"
+	"github.com/gofurry/steam-go/internal/request"
+	"github.com/gofurry/steam-go/internal/response"
 )
 
 // GetFriendsSharedYearInReviewOptions controls optional query parameters for GetFriendsSharedYearInReview.

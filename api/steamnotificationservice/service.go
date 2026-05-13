@@ -1,6 +1,6 @@
 package steamnotificationservice
 
-import "github.com/GoFurry/steam-go/internal/request"
+import "github.com/gofurry/steam-go/internal/request"
 
 // Service exposes ISteamNotificationService methods.
 type Service struct {

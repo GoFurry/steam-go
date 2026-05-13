@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	steam "github.com/GoFurry/steam-go"
-	"github.com/GoFurry/steam-go/addons/openid"
+	steam "github.com/gofurry/steam-go"
+	"github.com/gofurry/steam-go/addons/openid"
 )
 
 const stateCookieName = "steam_openid_state"

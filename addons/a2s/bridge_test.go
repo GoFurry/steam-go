@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	a2saddon "github.com/GoFurry/steam-go/addons/a2s"
+	a2saddon "github.com/gofurry/steam-go/addons/a2s"
 )
 
 func TestNewClientBridgesToA2SGo(t *testing.T) {

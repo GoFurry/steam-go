@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	steam "github.com/GoFurry/steam-go"
-	"github.com/GoFurry/steam-go/api/steamuserstats"
+	steam "github.com/gofurry/steam-go"
+	"github.com/gofurry/steam-go/api/steamuserstats"
 )
 
 func main() {

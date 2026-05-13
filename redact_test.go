@@ -3,7 +3,7 @@ package steam_test
 import (
 	"testing"
 
-	steam "github.com/GoFurry/steam-go"
+	steam "github.com/gofurry/steam-go"
 )
 
 func TestRedactSensitiveURLRemovesCredentials(t *testing.T) {

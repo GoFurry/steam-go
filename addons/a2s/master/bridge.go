@@ -1,7 +1,7 @@
 package master
 
 import (
-	upstream "github.com/GoFurry/a2s-go/master"
+	upstream "github.com/gofurry/a2s-go/master"
 )
 
 type Client = upstream.Client

@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoFurry/steam-go/internal/auth"
-	sdkerrors "github.com/GoFurry/steam-go/internal/errors"
-	"github.com/GoFurry/steam-go/internal/traffic"
+	"github.com/gofurry/steam-go/internal/auth"
+	sdkerrors "github.com/gofurry/steam-go/internal/errors"
+	"github.com/gofurry/steam-go/internal/traffic"
 )
 
 const defaultUserAgent = "steam-go/1"

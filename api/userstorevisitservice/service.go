@@ -1,6 +1,6 @@
 package userstorevisitservice
 
-import "github.com/GoFurry/steam-go/internal/request"
+import "github.com/gofurry/steam-go/internal/request"
 
 // Service exposes IUserStoreVisitService methods.
 type Service struct {

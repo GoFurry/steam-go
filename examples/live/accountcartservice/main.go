@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/GoFurry/steam-go/api/accountcartservice"
-	"github.com/GoFurry/steam-go/examples/live/internal/realtest"
+	"github.com/gofurry/steam-go/api/accountcartservice"
+	"github.com/gofurry/steam-go/examples/live/internal/realtest"
 )
 
 func main() {

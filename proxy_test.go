@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	steam "github.com/GoFurry/steam-go"
-	"github.com/GoFurry/steam-go/internal/traffic"
+	steam "github.com/gofurry/steam-go"
+	"github.com/gofurry/steam-go/internal/traffic"
 )
 
 func TestNewStaticProxySelector(t *testing.T) {

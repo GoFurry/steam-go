@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoFurry/steam-go/addons/openid"
+	"github.com/gofurry/steam-go/addons/openid"
 )
 
 func TestNewVerifierValidatesConfig(t *testing.T) {

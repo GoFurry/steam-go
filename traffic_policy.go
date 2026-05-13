@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoFurry/steam-go/internal/request"
-	itraffic "github.com/GoFurry/steam-go/internal/traffic"
+	"github.com/gofurry/steam-go/internal/request"
+	itraffic "github.com/gofurry/steam-go/internal/traffic"
 	"golang.org/x/time/rate"
 )
 

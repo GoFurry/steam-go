@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	scanneraddon "github.com/GoFurry/steam-go/addons/a2s/scanner"
+	scanneraddon "github.com/gofurry/steam-go/addons/a2s/scanner"
 )
 
 func TestNewClientBridgesToScanner(t *testing.T) {

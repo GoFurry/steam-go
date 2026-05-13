@@ -3,7 +3,7 @@ package steam
 import (
 	"testing"
 
-	"github.com/GoFurry/steam-go/internal/transport"
+	"github.com/gofurry/steam-go/internal/transport"
 	"golang.org/x/time/rate"
 )
 

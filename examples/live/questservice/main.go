@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/GoFurry/steam-go/api/questservice"
-	"github.com/GoFurry/steam-go/examples/live/internal/realtest"
+	"github.com/gofurry/steam-go/api/questservice"
+	"github.com/gofurry/steam-go/examples/live/internal/realtest"
 )
 
 func main() {

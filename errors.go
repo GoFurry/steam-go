@@ -1,6 +1,6 @@
 package steam
 
-import sdkerrors "github.com/GoFurry/steam-go/internal/errors"
+import sdkerrors "github.com/gofurry/steam-go/internal/errors"
 
 // ErrorKind classifies SDK errors by lifecycle stage.
 type ErrorKind = sdkerrors.Kind

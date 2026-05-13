@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	steam "github.com/GoFurry/steam-go"
+	steam "github.com/gofurry/steam-go"
 )
 
 func main() {

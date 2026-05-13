@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoFurry/steam-go/internal/errors"
-	"github.com/GoFurry/steam-go/internal/traffic"
+	"github.com/gofurry/steam-go/internal/errors"
+	"github.com/gofurry/steam-go/internal/traffic"
 )
 
 func TestNewBlockRuntimeOnlySupportsPublicStorePage(t *testing.T) {

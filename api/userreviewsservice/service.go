@@ -1,6 +1,6 @@
 package userreviewsservice
 
-import "github.com/GoFurry/steam-go/internal/request"
+import "github.com/gofurry/steam-go/internal/request"
 
 // Service exposes IUserReviewsService methods.
 type Service struct {

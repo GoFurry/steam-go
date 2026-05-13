@@ -3,7 +3,7 @@ package a2s
 import (
 	"net"
 
-	upstream "github.com/GoFurry/a2s-go"
+	upstream "github.com/gofurry/a2s-go"
 )
 
 type Client = upstream.Client

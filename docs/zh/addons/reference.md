@@ -29,7 +29,7 @@ go run ./examples/openid --proxy http://127.0.0.1:7897
 
 ## `addons/a2s`
 
-`addons/a2s` 是对独立包 [`github.com/GoFurry/a2s-go`](https://github.com/GoFurry/a2s-go) 的轻量桥接。
+`addons/a2s` 是对独立包 [`github.com/gofurry/a2s-go`](https://github.com/gofurry/a2s-go) 的轻量桥接。
 
 它适合直接查询游戏服务器：
 

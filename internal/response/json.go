@@ -3,7 +3,7 @@ package response
 import (
 	"encoding/json"
 
-	sdkerrors "github.com/GoFurry/steam-go/internal/errors"
+	sdkerrors "github.com/gofurry/steam-go/internal/errors"
 )
 
 // DecodeJSON parses the response body into the target type.

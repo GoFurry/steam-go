@@ -1,9 +1,9 @@
 # steam-go
 
-[中文Wiki](https://github.com/GoFurry/steam-go/wiki/%E9%A6%96%E9%A1%B5) | 
-[Steam Key 与 Access Token](https://github.com/GoFurry/steam-go/wiki/Steam-Key-%E4%B8%8E-Access-Token) | 
+[中文Wiki](https://github.com/gofurry/steam-go/wiki/%E9%A6%96%E9%A1%B5) | 
+[Steam Key 与 Access Token](https://github.com/gofurry/steam-go/wiki/Steam-Key-%E4%B8%8E-Access-Token) | 
 [English](../../README.md) | 
-[Steam Keys and Access Tokens](https://github.com/GoFurry/steam-go/wiki/Steam-Keys-and-Access-Tokens)
+[Steam Keys and Access Tokens](https://github.com/gofurry/steam-go/wiki/Steam-Keys-and-Access-Tokens)
 
 `steam-go` 是一个专注于官方 Steam Web API 的轻量级 Go SDK。
 
@@ -23,7 +23,7 @@
 ## 安装
 
 ```bash
-go get github.com/GoFurry/steam-go@latest
+go get github.com/gofurry/steam-go@latest
 ```
 
 ## 快速开始
@@ -36,7 +36,7 @@ import (
 	"fmt"
 	"time"
 
-	steam "github.com/GoFurry/steam-go"
+	steam "github.com/gofurry/steam-go"
 )
 
 func main() {
@@ -96,7 +96,7 @@ func main() {
 
 ## Addons
 
-- `addons/a2s`：桥接到独立发布的 [`github.com/GoFurry/a2s-go`](https://github.com/GoFurry/a2s-go) `v1.0.1`
+- `addons/a2s`：桥接到独立发布的 [`github.com/gofurry/a2s-go`](https://github.com/gofurry/a2s-go) `v1.0.1`
 - `addons/openid`：用于 Steam OpenID 登录识别
 - OpenID 只负责确认 Steam 身份并返回 `SteamID64`，不会替代 Web API 凭证
 - 更详细的 addon 说明见 [addons/reference.md](addons/reference.md)

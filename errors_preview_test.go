@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	steam "github.com/GoFurry/steam-go"
+	steam "github.com/gofurry/steam-go"
 )
 
 func TestAPIErrorBodyPreviewReturnsEmptyForNonPositiveMax(t *testing.T) {

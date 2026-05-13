@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/GoFurry/steam-go/internal/endpoint"
-	"github.com/GoFurry/steam-go/internal/request"
-	"github.com/GoFurry/steam-go/internal/response"
+	"github.com/gofurry/steam-go/internal/endpoint"
+	"github.com/gofurry/steam-go/internal/request"
+	"github.com/gofurry/steam-go/internal/response"
 )
 
 // GetServerInfo returns current Steam Web API server time metadata.

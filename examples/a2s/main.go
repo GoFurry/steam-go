@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	a2saddon "github.com/GoFurry/steam-go/addons/a2s"
+	a2saddon "github.com/gofurry/steam-go/addons/a2s"
 )
 
 func main() {

@@ -1,6 +1,6 @@
 package billingservice
 
-import "github.com/GoFurry/steam-go/internal/request"
+import "github.com/gofurry/steam-go/internal/request"
 
 // Service exposes IBillingService methods.
 type Service struct {

@@ -1,17 +1,17 @@
 # steam-go
 
 ![License](https://img.shields.io/badge/License-MIT-6C757D?style=flat&color=3B82F6)
-![Release](https://img.shields.io/github/v/release/GoFurry/steam-go?style=flat&color=blue)
+![Release](https://img.shields.io/github/v/release/gofurry/steam-go?style=flat&color=blue)
 ![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go&logoColor=white)
-[![Go Report Card](https://goreportcard.com/badge/github.com/GoFurry/steam-go)](https://goreportcard.com/report/github.com/GoFurry/steam-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gofurry/steam-go)](https://goreportcard.com/report/github.com/gofurry/steam-go)
 
 ![Weekend Project](https://img.shields.io/badge/weekend-project-8B5CF6?style=flat)
 ![Made with Love](https://img.shields.io/badge/made%20with-%E2%9D%A4-E11D48?style=flat&color=orange)
 
-[steam-go Wiki](https://github.com/GoFurry/steam-go/wiki) | 
-[Steam Keys and Access Tokens](https://github.com/GoFurry/steam-go/wiki/Steam-Keys-and-Access-Tokens) | 
+[steam-go Wiki](https://github.com/gofurry/steam-go/wiki) | 
+[Steam Keys and Access Tokens](https://github.com/gofurry/steam-go/wiki/Steam-Keys-and-Access-Tokens) | 
 [中文文档](docs/zh/README.md) | 
-[Steam Key 与 Access Token](https://github.com/GoFurry/steam-go/wiki/Steam-Key-%E4%B8%8E-Access-Token)
+[Steam Key 与 Access Token](https://github.com/gofurry/steam-go/wiki/Steam-Key-%E4%B8%8E-Access-Token)
 
 `steam-go` is a lightweight Go SDK focused on the official Steam Web API.
 
@@ -33,7 +33,7 @@
 ## Installation
 
 ```bash
-go get github.com/GoFurry/steam-go@latest
+go get github.com/gofurry/steam-go@latest
 ```
 
 ## Quick Start
@@ -46,7 +46,7 @@ import (
 	"fmt"
 	"time"
 
-	steam "github.com/GoFurry/steam-go"
+	steam "github.com/gofurry/steam-go"
 )
 
 func main() {
@@ -106,7 +106,7 @@ When a method signature explicitly asks for `accessToken` or `key`, that credent
 
 ## Addons
 
-- `addons/a2s` is a lightweight bridge to [`github.com/GoFurry/a2s-go`](https://github.com/GoFurry/a2s-go) `v1.0.1`
+- `addons/a2s` is a lightweight bridge to [`github.com/gofurry/a2s-go`](https://github.com/gofurry/a2s-go) `v1.0.1`
 - `addons/openid` provides Steam OpenID login verification for browser-based sign-in flows
 - OpenID only confirms Steam identity and returns `SteamID64`; it does not replace Web API credentials
 - detailed addon notes live in [docs/addons/reference.md](docs/addons/reference.md)

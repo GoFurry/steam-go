@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	sdkerrors "github.com/GoFurry/steam-go/internal/errors"
-	"github.com/GoFurry/steam-go/internal/traffic"
+	sdkerrors "github.com/gofurry/steam-go/internal/errors"
+	"github.com/gofurry/steam-go/internal/traffic"
 )
 
 const defaultBlockHTMLSniffBytes = 8 * 1024

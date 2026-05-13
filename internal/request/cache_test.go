@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoFurry/steam-go/internal/traffic"
+	"github.com/gofurry/steam-go/internal/traffic"
 )
 
 type cacheTestJar struct {

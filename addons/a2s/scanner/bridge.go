@@ -1,8 +1,8 @@
 package scanner
 
 import (
-	masterupstream "github.com/GoFurry/a2s-go/master"
-	upstream "github.com/GoFurry/a2s-go/scanner"
+	masterupstream "github.com/gofurry/a2s-go/master"
+	upstream "github.com/gofurry/a2s-go/scanner"
 )
 
 type Client = upstream.Client

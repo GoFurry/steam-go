@@ -1,6 +1,6 @@
 package steamuseroauth
 
-import "github.com/GoFurry/steam-go/api/steamuser"
+import "github.com/gofurry/steam-go/api/steamuser"
 
 // GetUserSummariesResponse matches ISteamUserOAuth/GetUserSummaries/v1.
 type GetUserSummariesResponse struct {

@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/GoFurry/steam-go/internal/request"
+	"github.com/gofurry/steam-go/internal/request"
 )
 
 const sdkDefaultUserAgent = "steam-go/1"
