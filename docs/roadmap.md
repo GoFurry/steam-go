@@ -53,14 +53,14 @@
 
 #### 任务
 
-- [ ] 增加 `docs/compatibility.md`
-- [ ] 增加 `docs/release-v1.md`
-- [ ] 增加 `CHANGELOG.md`
-- [ ] 增加 `docs/endpoint-stability.md`
-- [ ] 增加 `docs/endpoint-coverage.md`
-- [ ] 复查 `README.md` 与 `docs/README_zh.md`，统一 RC 口径
-- [ ] 明确 `v1.0.0` 前不再扩充新的 API 覆盖
-- [ ] 明确 Store / Community / CDN / browser fallback 不属于 `v1.0.0` 稳定承诺
+- [x] 增加 `docs/compatibility.md`
+- [x] 增加 `docs/release-v1.md`
+- [x] 增加 `CHANGELOG.md`
+- [x] 增加 `docs/endpoint-stability.md`
+- [x] 增加 `docs/endpoint-coverage.md`
+- [x] 复查 `README.md` 与 `docs/README_zh.md`，统一 RC 口径
+- [x] 明确 `v1.0.0` 前不再扩充新的 API 覆盖
+- [x] 明确 Store / Community / CDN / browser fallback 不属于 `v1.0.0` 稳定承诺
 
 #### 验收标准
 
