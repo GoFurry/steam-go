@@ -37,6 +37,7 @@ Focus:
 
 - regression validation
 - examples and docs consistency
+- live smoke entry cleanup
 - bug fixes
 - release hardening
 
@@ -45,6 +46,7 @@ Rules:
 - no new API coverage
 - no major architecture changes
 - only bug fixes, tests, and documentation improvements
+- real API smoke entrypoints should live under `examples/live/`, not under `test/`
 
 ## v1.0.0 release gate
 
@@ -54,7 +56,7 @@ The project should not ship `v1.0.0` until the following are true:
 - compatibility policy is published
 - endpoint stability and endpoint coverage are documented
 - README and Chinese docs align with the release positioning
-- examples still match the documented public APIs
+- examples and `examples/live/` still match the documented public APIs and validation workflow
 - `go test ./...`, `go vet ./...`, and `go test -race ./...` pass
 - CI remains green, including `staticcheck` and `govulncheck`
 

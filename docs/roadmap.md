@@ -73,7 +73,7 @@
 
 ### v1.0.0-rc.2 - 硬化与验证
 
-**状态：** Planned  
+**状态：** Completed  
 **范围：** Testing / Stability / Documentation  
 **目标：** 围绕已冻结的稳定面做回归验证与发布前硬化，只接受 bug fix 和文档修订。
 
@@ -86,20 +86,21 @@
 
 #### 任务
 
-- [ ] 补充稳定 public behavior 的 contract-style 覆盖
+- [x] 补充稳定 public behavior 的 contract-style 覆盖
   - retry / backoff
   - rate limit / safe defaults
   - proxy selection / proxy health
   - traffic policy isolation
   - OpenID verification 边界行为
-- [ ] 复查并收口测试组织、命名和超大测试文件
-- [ ] 确认 examples、README、docs 与冻结后的 public API 一致
-- [ ] 清理 `test` / `race` / `vet` / `staticcheck` / `govulncheck` 暴露的问题
-- [ ] 只修 bug、补测试、补文档，不引入新的 API 覆盖或新的架构主线
+- [x] 复查并收口测试组织、命名和超大测试文件
+- [x] 确认 examples、README、docs 与冻结后的 public API 一致
+- [x] 清理 `test` / `race` / `vet` / `staticcheck` / `govulncheck` 暴露的问题
+- [x] 只修 bug、补测试、补文档，不引入新的 API 覆盖或新的架构主线
 
 #### 验收标准
 
 - 核心 public API 有足够回归保护
+- `examples/live/` 成为唯一真实 smoke 入口
 - examples 可运行且与文档一致
 - CI 全绿且没有 blocker 级问题
 - `rc.2` 没有引入新的 API 覆盖扩展

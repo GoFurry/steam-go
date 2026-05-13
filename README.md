@@ -12,7 +12,7 @@
 
 `steam-go` is a lightweight Go SDK focused on the official Steam Web API.
 
-`v1.0.0-rc.1` freezes the stable surface and release boundaries. Before `v1.0.0`, the project is not planning to expand new API coverage.
+`v1.0.0-rc.2` is focused on regression protection, live smoke cleanup, and release hardening. Before `v1.0.0`, the project is not planning to expand new API coverage.
 
 ## Features
 
@@ -303,9 +303,14 @@ On China-region networks, browser login may succeed while the server-side Steam 
 - `go run ./examples/openid --proxy http://127.0.0.1:7897`
 - `go run ./examples/proxy`
 - `go run ./examples/traffic`
-- `go run ./test/steamuser`
-- `go run ./test/playerservice`
-- `go run ./test/wishlistservice`
+- `go run ./examples/steamuser`
+- `go run ./examples/playerservice`
+- `go run ./examples/steamuserstats`
+- `go run ./examples/steamnews`
+- `go run ./examples/live/steamuser`
+- `go run ./examples/live/playerservice`
+- `go run ./examples/live/wishlistservice`
+- full live smoke list: [examples/live/README.md](examples/live/README.md)
 
 ## Error Handling
 

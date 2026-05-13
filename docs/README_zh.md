@@ -4,7 +4,7 @@
 
 `steam-go` 是一个专注于官方 Steam Web API 的轻量级 Go SDK。
 
-`v1.0.0-rc.1` 的重点是冻结稳定面和发布边界。在 `v1.0.0` 正式版之前，项目暂时不再扩充新的 API 覆盖。
+`v1.0.0-rc.2` 的重点是补齐回归保护、整理 live smoke 入口并完成发布前硬化。在 `v1.0.0` 正式版之前，项目暂时不再扩充新的 API 覆盖。
 
 ## 特性
 
@@ -293,9 +293,14 @@ if err != nil {
 - `go run ./examples/openid`
 - `go run ./examples/openid --proxy http://127.0.0.1:7897`
 - `go run ./examples/proxy`
-- `go run ./test/steamuser`
-- `go run ./test/playerservice`
-- `go run ./test/wishlistservice`
+- `go run ./examples/steamuser`
+- `go run ./examples/playerservice`
+- `go run ./examples/steamuserstats`
+- `go run ./examples/steamnews`
+- `go run ./examples/live/steamuser`
+- `go run ./examples/live/playerservice`
+- `go run ./examples/live/wishlistservice`
+- 完整 live smoke 列表见 [../examples/live/README.md](../examples/live/README.md)
 
 ## 错误处理
 
