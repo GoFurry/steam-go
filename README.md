@@ -8,9 +8,12 @@
 ![Weekend Project](https://img.shields.io/badge/weekend-project-8B5CF6?style=flat)
 ![Made with Love](https://img.shields.io/badge/made%20with-%E2%9D%A4-E11D48?style=flat&color=orange)
 
-[中文文档](docs/README_zh.md)
+[steam-go Wiki](https://github.com/GoFurry/steam-go/wiki) | 
+[中文文档](docs/zh/README.md)
 
-`steam-go` is a lightweight Go SDK focused on the Steam Web API.
+`steam-go` is a lightweight Go SDK focused on the official Steam Web API.
+
+`v1.0.0` is the first stable release of `steam-go`, positioned as a production-oriented Go SDK for the official Steam Web API.
 
 ## Features
 
@@ -68,7 +71,14 @@ func main() {
 }
 ```
 
-Detailed API group references live in [docs/api.md](docs/api.md).
+Detailed API group references live in [docs/api/reference.md](docs/api/reference.md).
+Project governance documents:
+
+- [Documentation Index](docs/README.md)
+- [Compatibility Policy](docs/governance/compatibility.md)
+- [Endpoint Stability](docs/governance/endpoint-stability.md)
+- [Endpoint Coverage](docs/governance/endpoint-coverage.md)
+- [v1.0.0 Release Notes](docs/releases/v1.0.0.md)
 
 ## WishlistService Coverage
 
@@ -96,7 +106,7 @@ When a method signature explicitly asks for `accessToken` or `key`, that credent
 - `addons/a2s` is a lightweight bridge to [`github.com/GoFurry/a2s-go`](https://github.com/GoFurry/a2s-go) `v1.0.1`
 - `addons/openid` provides Steam OpenID login verification for browser-based sign-in flows
 - OpenID only confirms Steam identity and returns `SteamID64`; it does not replace Web API credentials
-- detailed addon notes live in [docs/addons.md](docs/addons.md)
+- detailed addon notes live in [docs/addons/reference.md](docs/addons/reference.md)
 
 ## Proxy
 
@@ -237,6 +247,8 @@ storeCtx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPubli
 _ = storeCtx
 ```
 
+`TrafficClassPublicStorePage` and its related helpers are infrastructure for future public store-page integrations. They are not built-in public store-page fetch APIs in `v1.0.0`.
+
 Public store-page profile example:
 
 ```go
@@ -293,9 +305,14 @@ On China-region networks, browser login may succeed while the server-side Steam 
 - `go run ./examples/openid --proxy http://127.0.0.1:7897`
 - `go run ./examples/proxy`
 - `go run ./examples/traffic`
-- `go run ./test/steamuser`
-- `go run ./test/playerservice`
-- `go run ./test/wishlistservice`
+- `go run ./examples/steamuser`
+- `go run ./examples/playerservice`
+- `go run ./examples/steamuserstats`
+- `go run ./examples/steamnews`
+- `go run ./examples/live/steamuser`
+- `go run ./examples/live/playerservice`
+- `go run ./examples/live/wishlistservice`
+- full live smoke list: [examples/live/README.md](examples/live/README.md)
 
 ## Error Handling
 

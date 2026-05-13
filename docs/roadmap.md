@@ -1,50 +1,19 @@
 # 路线图
 
-本文档用于记录 `steam-go` 后续版本的推进顺序与工程改进主线。
-
 ## 当前状态
 
-- `v1.0.0-alpha-1`：已完成基础 `Client`、`client.API.*` 分组与请求骨架
-- `v1.0.0-alpha-2`：已发布，完成首批服务覆盖与请求层加固
-- `v1.0.0-alpha-3`：已完成，补齐了公开商店页相关的策略隔离、请求控制、代理能力与稳定性骨架
+`steam-go` 已完成 `v1.0.0` 正式版发布前的主要准备工作：
 
-## 下一阶段：pre-v1
+- 稳定 public API 边界已定义
+- 兼容性、endpoint 覆盖、endpoint 稳定性文档已整理
+- 真实 live smoke 入口已统一到 `examples/live/`
+- `v1.0.0` release notes 已准备
 
-重点方向：从“能力已具备”转向“可长期维护、可稳定依赖、可清晰发布”。
+当前没有任何 `v1.x` 后续排期。下一阶段安排确定后，再在本文档中补充新的版本计划。
 
-### 工程质量与测试体系
+## 维护规则
 
-- 巩固 CI，持续执行 `test`、`race`、`vet`、`staticcheck`、`govulncheck`
-- 建立更清晰的 contract tests 分层
-- 区分常规测试与 live API workflow
-- 收敛超大测试文件、命名不清晰和目录职责边界问题
-
-### 文档与示例治理
-
-- 整理 `examples/`、`test/`、未来 `examples/live/` 的职责边界
-- 增加 endpoint stability 文档
-- 增加 endpoint coverage 文档
-- 增加 compatibility 文档
-- 增加更系统的 godoc examples
-
-### 发布与兼容性治理
-
-- 增加 `CHANGELOG.md`
-- 明确 public API 兼容性策略
-- 对易变 payload、raw/typed 边界、addons 边界继续补文档
-- 在 pre-v1 阶段尽量减少无必要的 public API 语义波动
-
-### 接口覆盖扩展
-
-- 优先补齐官方公开、稳定、低权限接口
-- 再逐步推进更高权限或更易变接口
-- 对公开商店页能力保持“明确隔离、渐进接入”的策略
-
-## v1.0.0 发布门槛
-
-- 核心 public API 命名与行为基本冻结
-- README 与核心文档体系完整
-- endpoint stability / coverage 文档可用
-- live workflow 与示例结构稳定
-- CI 与基础质量检查齐备
-- 官方稳定接口覆盖达到可正式依赖水平
+- `roadmap.md` 只记录未来计划和当前阶段状态，不再承担历史 changelog 职责。
+- 已发布版本的说明以 GitHub Releases 和 `docs/releases/` 为准。
+- 没有明确排期时，保持本文档简洁，不预先写入猜测性的 `v1.x` 任务。
+- 新增 roadmap 项目前，应先确认目标、范围、验收标准和是否会影响稳定 API。
