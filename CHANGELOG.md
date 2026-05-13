@@ -6,17 +6,19 @@ The format is intentionally simple during the pre-v1 release phase.
 
 ## Unreleased
 
-### Planned for v1.0.0-rc.1
+- no new API coverage is planned before `v1.1.0`
 
-- freeze the `v1.0.0` stable surface
-- publish compatibility, release, endpoint stability, and endpoint coverage documents
-- align README and Chinese docs with the release candidate message
+## v1.0.0
 
-### Planned for v1.0.0-rc.2
+### Stable release summary
 
-- regression validation and release hardening
-- example and documentation consistency checks
-- bug fixes only, no new API coverage
+- first stable `steam-go` release
+- stable root `Client` and grouped `client.API.*` access pattern
+- stable functional option system for credentials, timeout, retry, rate limit, proxy, and traffic policy configuration
+- production-oriented request controls including safe defaults, retry hardening, proxy routing, sticky proxy support, health-checked proxy pools, and traffic-class isolation
+- stable addon entrypoints for `addons/openid` and `addons/a2s`
+- published compatibility, endpoint stability, endpoint coverage, and release-governance documentation
+- live smoke validation consolidated under `examples/live/`
 
 ## v1.0.0-alpha-3
 

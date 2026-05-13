@@ -13,7 +13,7 @@
 
 `steam-go` is a lightweight Go SDK focused on the official Steam Web API.
 
-`v1.0.0-rc.2` is focused on regression protection, live smoke cleanup, and release hardening. Before `v1.0.0`, the project is not planning to expand new API coverage.
+`v1.0.0` is the first stable release of `steam-go`, positioned as a production-oriented Go SDK for the official Steam Web API.
 
 ## Features
 

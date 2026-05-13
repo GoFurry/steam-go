@@ -109,7 +109,7 @@
 
 ### v1.0.0 - 首个正式稳定版
 
-**状态：** Planned  
+**状态：** Ready  
 **范围：** Release / Documentation / Stability  
 **目标：** 正式发布首个稳定版，定位为面向生产使用的 Steam Web API Go SDK。
 
@@ -121,10 +121,10 @@
 
 #### 任务
 
-- [ ] 完成最终 release notes
-- [ ] 确认稳定 public surface 与 RC 阶段承诺一致
-- [ ] 确认 README、核心 docs、compatibility 说明、examples 已完整
-- [ ] 打 tag 并发布 `v1.0.0`
+- [x] 完成最终 release notes
+- [x] 确认稳定 public surface 与 RC 阶段承诺一致
+- [x] 确认 README、核心 docs、compatibility 说明、examples 已完整
+- [ ] 由维护者手动打 tag 并发布 `v1.0.0`
 
 #### 验收标准
 

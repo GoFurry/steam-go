@@ -5,7 +5,7 @@
 
 `steam-go` 是一个专注于官方 Steam Web API 的轻量级 Go SDK。
 
-`v1.0.0-rc.2` 的重点是补齐回归保护、整理 live smoke 入口并完成发布前硬化。在 `v1.0.0` 正式版之前，项目暂时不再扩充新的 API 覆盖。
+`v1.0.0` 是 `steam-go` 的首个正式稳定版，定位为一个面向生产使用、专注于官方 Steam Web API 的 Go SDK。
 
 ## 特性
 
@@ -167,7 +167,7 @@ storeCtx := steam.WithTrafficClass(context.Background(), steam.TrafficClassPubli
 _ = storeCtx
 ```
 
-`TrafficClassPublicStorePage` 以及相关的 header / Referer / cache / block / transport hook 能力，目前的定位是“策略隔离与基础设施”，并不代表 `v1.0.0-rc.1` 已经内置公开商店页抓取 API。
+`TrafficClassPublicStorePage` 以及相关的 header / Referer / cache / block / transport hook 能力，目前的定位是“策略隔离与基础设施”，并不代表 `v1.0.0` 已经内置公开商店页抓取 API。
 
 公开商店页请求画像示例：
 

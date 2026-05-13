@@ -60,6 +60,15 @@ The project should not ship `v1.0.0` until the following are true:
 - `go test ./...`, `go vet ./...`, and `go test -race ./...` pass
 - CI remains green, including `staticcheck` and `govulncheck`
 
+## Final pre-release status
+
+At the current stage, `steam-go` is ready for the `v1.0.0` release process with one manual step intentionally left to the maintainer:
+
+- prepare and publish the final Git tag
+- publish the GitHub release entry
+
+Everything else in the release gate should already be treated as complete or release-candidate verified.
+
 ## Stable surface summary
 
 The intended stable surface for `v1.0.0` includes:
