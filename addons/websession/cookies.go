@@ -19,6 +19,14 @@ type WebCookieResult struct {
 	Domains   []string
 }
 
+// CookieJar exposes the Store/Community cookie jar so addon packages can reuse it.
+func (r *WebCookieResult) CookieJar(_ context.Context) (http.CookieJar, error) {
+	if r == nil || r.Jar == nil {
+		return nil, &Error{Code: ErrorCodeConfig, Op: "cookie_jar", Message: "cookie jar must not be nil"}
+	}
+	return r.Jar, nil
+}
+
 type finalizeLoginResponse struct {
 	Error        int            `json:"error"`
 	Message      string         `json:"message"`

@@ -6,3 +6,5 @@ require (
 	github.com/gofurry/a2s-go v1.0.2
 	golang.org/x/time v0.14.0
 )
+
+require golang.org/x/net v0.50.0

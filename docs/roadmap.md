@@ -49,12 +49,12 @@
 - [x] 在 `addons/websession` 中支持手机批准、手机令牌、邮箱验证码三类确认路径
 - [x] 在 `addons/websession` 中实现 refresh token 到 Web Cookie 的转换，复用同一个 `CookieJar` 完成 `finalizelogin` 与 transfer 请求
 - [x] 在 `addons/websession` 中实现 Store 与 Community session 校验，避免只依赖 `/account/licenses/`
-- [ ] 新增 `addons/freeclaim`，只依赖调用方提供的 Web Cookie / CookieJar，不管理账号密码或 refresh token
-- [ ] 在 `addons/freeclaim` 中实现限时免费候选搜索，先按 POC 经验解析 Store search HTML 片段
-- [ ] 在 `addons/freeclaim` 中复用 `client.Web.Storefront.GetAppDetails`，从 `package_groups` raw payload 中解析免费 package/subid
-- [ ] 在 `addons/freeclaim` 中实现单个 package 的免费 license 领取，优先从 app 页面表单解析隐藏字段
-- [ ] 在 `addons/freeclaim` 中区分领取成功、已拥有、登录失效、疑似限流等结果
-- [ ] 增加面向认证、websession、freeclaim 的单元测试和 fixture，覆盖请求构造、protobuf 字段、错误映射、HTML 解析和成功判定
+- [x] 新增 `addons/freeclaim`，只依赖调用方提供的 Web Cookie / CookieJar，不管理账号密码或 refresh token
+- [x] 在 `addons/freeclaim` 中实现限时免费候选搜索，先按 POC 经验解析 Store search HTML 片段
+- [x] 在 `addons/freeclaim` 中复用 `client.Web.Storefront.GetAppDetails`，从 `package_groups` raw payload 中解析免费 package/subid
+- [x] 在 `addons/freeclaim` 中实现单个 package 的免费 license 领取，优先从 app 页面表单解析隐藏字段
+- [x] 在 `addons/freeclaim` 中区分领取成功、已拥有、登录失效、疑似限流等结果
+- [x] 增加面向认证、websession、freeclaim 的单元测试和 fixture，覆盖请求构造、protobuf 字段、错误映射、HTML 解析和成功判定
 - [ ] 增加 live smoke 示例，但默认不在 CI 中执行
 - [ ] 更新英文与中文文档，说明主线 API、Web session addon、freeclaim addon 的边界、限制和安全注意事项
 - [ ] 明确不支持读取浏览器 Cookie、读取 Steam 客户端本地 token、自动全部领取、无限重试和本地账号数据库
