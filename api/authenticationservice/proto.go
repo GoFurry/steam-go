@@ -2,6 +2,7 @@ package authenticationservice
 
 import (
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"net/url"
 )
@@ -37,9 +38,36 @@ func appendProtoString(dst []byte, number uint64, value string) []byte {
 	return append(dst, value...)
 }
 
+func appendProtoBytes(dst []byte, number uint64, value []byte) []byte {
+	if len(value) == 0 {
+		return dst
+	}
+	dst = appendProtoKey(dst, number, protoWireBytes)
+	dst = appendProtoVarint(dst, uint64(len(value)))
+	return append(dst, value...)
+}
+
+func appendProtoMessage(dst []byte, number uint64, message []byte) []byte {
+	return appendProtoBytes(dst, number, message)
+}
+
+func appendProtoBool(dst []byte, number uint64, value bool) []byte {
+	if value {
+		return appendProtoUint64(dst, number, 1)
+	}
+	return appendProtoUint64(dst, number, 0)
+}
+
 func appendProtoUint64(dst []byte, number, value uint64) []byte {
 	dst = appendProtoKey(dst, number, protoWireVarint)
 	return appendProtoVarint(dst, value)
+}
+
+func appendProtoFixed64(dst []byte, number, value uint64) []byte {
+	dst = appendProtoKey(dst, number, protoWireFixed64)
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], value)
+	return append(dst, buf[:]...)
 }
 
 func appendProtoKey(dst []byte, number, wire uint64) []byte {

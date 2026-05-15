@@ -38,10 +38,10 @@
 
 - [x] 新增 `api/authenticationservice`，接入 `client.API.AuthenticationService`
 - [x] 实现 `GetPasswordRSAPublicKey`
-- [ ] 实现 `BeginAuthSessionViaCredentials`
-- [ ] 实现 `BeginAuthSessionViaQR`
-- [ ] 实现 `UpdateAuthSessionWithSteamGuardCode`
-- [ ] 实现 `PollAuthSessionStatus`
+- [x] 实现 `BeginAuthSessionViaCredentials`
+- [x] 实现 `BeginAuthSessionViaQR`
+- [x] 实现 `UpdateAuthSessionWithSteamGuardCode`
+- [x] 实现 `PollAuthSessionStatus`
 - [x] 在 `api/authenticationservice` 内部实现最小 protobuf form 编码/解码 helper，暂不引入公共 protobuf 抽象
 - [x] 增加 RSA 密码加密 helper，并明确其只辅助认证原子接口，不保存密码、不编排完整登录
 - [x] 增加 `EResultError` 或等价可 `errors.As` 的错误类型，用于识别 `DuplicateRequest`、`AccountLogonDenied`、`InvalidLoginAuthCode`、`ExpiredLoginAuthCode`、`RateLimitExceeded`
